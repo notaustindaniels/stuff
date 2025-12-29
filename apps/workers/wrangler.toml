@@ -1,0 +1,40 @@
+name = "platform-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+workers_dev = true
+preview_urls = true
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "PLATFORM_KV"
+id = "20303aa213d14ee39a27ed0c1c20e0fc"
+
+[[kv_namespaces]]
+binding = "RATE_LIMITS"
+id = "97e173aea9224bffb67f3c1f2ae343d2"
+
+# R2 Bucket
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "platform-storage"
+
+# Queue Producer
+[[queues.producers]]
+binding = "VIDEO_QUEUE"
+queue = "video-processing-queue"
+
+# Vectorize
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "platform-rag-index"
+
+# Environment Variables
+[vars]
+ENVIRONMENT = "development"
+
+# Routes - THIS MUST BE AT THE TOP LEVEL, NOT INSIDE [vars]
+[[routes]]
+pattern = "api.quickbizkit.ai/*"
+zone_name = "quickbizkit.ai"
