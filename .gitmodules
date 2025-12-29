@@ -1,0 +1,3 @@
+[submodule "claude-quickstarts"]
+	path = claude-quickstarts
+	url = https://github.com/notaustindaniels/claude-quickstarts.git
