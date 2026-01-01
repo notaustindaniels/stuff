@@ -1,0 +1,1850 @@
+<project_specification>
+  <project_name>White-Label Multi-Tenant Headless CMS, LMS & Community Platform</project_name>
+
+  <overview>
+    Build a comprehensive, white-label-able Multi-Tenant SaaS platform designed for course creators and educators. 
+    The architecture utilizes a Cloudflare-native approach with Turso for per-tenant database isolation, ensuring true data sovereignty, 
+    security, and blast radius containment (an attack on Tenant A affects ONLY Tenant A). 
+    
+    The system features a modular monorepo structure including a Headless CMS, Learning Management System (LMS), 
+    Community Platform (Skool-like), Video Processing Pipeline (OpusClip-like), and AI-powered content generation. 
+    It supports hierarchical roles (God-mode, Super-admin, Admin, User) and custom domain mapping via Cloudflare for SaaS.
+    
+    Each module is designed to be independently extractable from the monorepo for isolated development, 
+    then seamlessly rejoined when consolidated development resumes.
+  </overview>
+
+  <technology_stack>
+    <api_keys>
+      API keys are located at /tmp/api-keys for testing.
+      You will not be allowed to read this file directly, but you can reference it in code.
+      
+      Available keys:
+      - ANTHROPIC_API_KEY: Platform owner testing (Claude Haiku 4.5 / Sonnet 4)
+      - TURSO_*: Database credentials
+      - CLERK_*: Authentication credentials
+      - EVOMI_*: Proxy credentials for video downloads
+      
+      Note: OpenRouter is NOT used for platform testing. 
+      Anthropic API is used directly for internal/admin AI features.
+    </api_keys>
+    
+    <frontend>
+      <framework>Next.js 16 (App Router, Server Components, Server Actions)</framework>
+      <styling>Tailwind CSS v4 (Utility-first)</styling>
+      <component_library>shadcn/ui (Radix primitives)</component_library>
+      <visual_builder>GrapesJS (Web, Email, Ebook contexts)</visual_builder>
+      <animation>Framer Motion (Page transitions, micro-interactions)</animation>
+      <port>3000</port>
+    </frontend>
+    
+    <backend>
+      <runtime>Cloudflare Workers (Edge Runtime)</runtime>
+      <database>Turso (libSQL) with Per-Tenant Database Isolation</database>
+      <orm>Drizzle ORM (Type-safe, excellent Turso support)</orm>
+      <storage>Cloudflare R2 (S3-compatible, zero egress fees)</storage>
+      <vector_db>Cloudflare Vectorize (RAG embeddings, per-tenant indexes)</vector_db>
+      <realtime>PartyKit (WebSockets, Presence) - Cloudflare-owned, free with Durable Objects pricing</realtime>
+    </backend>
+    
+    <communication>
+      <api>tRPC / REST via Next.js Server Actions</api>
+      <async_jobs>Cloudflare Queues</async_jobs>
+      <scheduled_jobs>Cloudflare Cron Triggers</scheduled_jobs>
+      <events>Event Bus for inter-module communication</events>
+      <ai_integration>
+        Platform Testing: Anthropic API direct (Claude 3.5 Haiku, Claude Sonnet 4)
+        User BYOK Options: OpenRouter, Anthropic, OpenAI
+      </ai_integration>
+      <image_generation>Flux.1 (AI images for video b-roll)</image_generation>
+    </communication>
+  </technology_stack>
+
+  <monorepo_structure>
+    <description>
+      Turborepo-based monorepo with packages (shared libraries), apps (deployables), and modules (extractable features).
+      Each module can be developed independently and has its own test suite.
+    </description>
+    
+    <directory_tree>
+      platform/
+      ├── package.json                 # Workspace root (npm/pnpm workspaces)
+      ├── turbo.json                   # Turborepo pipeline config
+      ├── .github/
+      │   └── workflows/
+      │       ├── ci.yml               # Test + Lint on PR
+      │       └── deploy.yml           # Deploy to Cloudflare
+      │
+      ├── packages/                    # Shared packages (@platform/*)
+      │   ├── core/                    # @platform/core
+      │   │   ├── package.json
+      │   │   └── src/
+      │   │       ├── types/           # Shared TypeScript interfaces
+      │   │       ├── utils/           # Common utilities
+      │   │       ├── middleware/      # Tenant context, auth helpers
+      │   │       └── index.ts
+      │   │
+      │   ├── database/                # @platform/database
+      │   │   ├── package.json
+      │   │   ├── drizzle.config.ts
+      │   │   └── src/
+      │   │       ├── client.ts        # Turso client factory
+      │   │       ├── schema/          # Drizzle schemas
+      │   │       └── migrations/      # SQL migrations
+      │   │
+      │   ├── realtime/                # @platform/realtime
+      │   │   ├── package.json
+      │   │   ├── partykit.json
+      │   │   └── src/
+      │   │       ├── chat-room.ts
+      │   │       ├── presence.ts
+      │   │       └── notifications.ts
+      │   │
+      │   ├── storage/                 # @platform/storage
+      │   │   ├── package.json
+      │   │   └── src/
+      │   │       ├── r2-client.ts
+      │   │       ├── signed-urls.ts
+      │   │       └── tenant-storage.ts
+      │   │
+      │   ├── ai/                      # @platform/ai
+      │   │   ├── package.json
+      │   │   └── src/
+      │   │       ├── openrouter.ts    # LLM client
+      │   │       ├── embeddings.ts    # Text embedding
+      │   │       ├── rag-pipeline.ts  # Vector search + generation
+      │   │       └── byok.ts          # Bring Your Own Key logic
+      │   │
+      │   └── analytics/               # @platform/analytics
+      │       ├── package.json
+      │       └── src/
+      │           ├── cost-tracking.ts
+      │           ├── usage-metrics.ts
+      │           └── projections.ts
+      │
+      ├── apps/                        # Deployable applications
+      │   ├── web/                     # Main Next.js 16 app
+      │   │   ├── package.json
+      │   │   ├── next.config.js
+      │   │   ├── app/                 # App Router pages
+      │   │   ├── components/          # UI components
+      │   │   └── lib/                 # App-specific utilities
+      │   │
+      │   ├── admin/                   # God-mode administration dashboard
+      │   │   ├── package.json
+      │   │   └── app/
+      │   │
+      │   ├── builder/                 # GrapesJS editor application
+      │   │   ├── package.json
+      │   │   └── src/
+      │   │
+      │   ├── video-processor/         # Video processing service
+      │   │   ├── package.json
+      │   │   └── src/
+      │   │
+      │   └── workers/                 # Cloudflare Workers entry points
+      │       ├── package.json
+      │       ├── wrangler.toml
+      │       └── src/
+      │
+      ├── modules/                     # Feature modules (independently extractable)
+      │   ├── auth/                    # Authentication & RBAC
+      │   │   ├── package.json
+      │   │   ├── src/
+      │   │   └── tests/
+      │   │       └── feature_list.json
+      │   │
+      │   ├── lms/                     # Learning Management System
+      │   │   ├── package.json
+      │   │   ├── src/
+      │   │   └── tests/
+      │   │       └── feature_list.json
+      │   │
+      │   ├── community/               # Forums, Chat, Groups
+      │   │   ├── package.json
+      │   │   ├── src/
+      │   │   └── tests/
+      │   │       └── feature_list.json
+      │   │
+      │   ├── cms/                     # Headless CMS & Funnels
+      │   │   ├── package.json
+      │   │   ├── src/
+      │   │   └── tests/
+      │   │       └── feature_list.json
+      │   │
+      │   ├── commerce/                # Billing & Subscriptions
+      │   │   ├── package.json
+      │   │   ├── src/
+      │   │   └── tests/
+      │   │       └── feature_list.json
+      │   │
+      │   ├── content-studio/          # Airtable-style organization
+      │   │   ├── package.json
+      │   │   ├── src/
+      │   │   └── tests/
+      │   │       └── feature_list.json
+      │   │
+      │   ├── email-marketing/         # Future: Campaign management
+      │   │   └── (placeholder)
+      │   │
+      │   └── sms-marketing/           # Future: Twilio integration
+      │       └── (placeholder)
+      │
+      ├── docker/
+      │   ├── Dockerfile
+      │   ├── Dockerfile.partykit
+      │   └── docker-compose.yml
+      │
+      └── docs/
+          ├── architecture.md
+          ├── deployment.md
+          └── api-reference.md
+    </directory_tree>
+  </monorepo_structure>
+
+  <testing_requirements>
+    <overview>
+      Each module requires 200 detailed end-to-end test cases.
+      Tests are stored in each module's tests/feature_list.json file.
+      Total platform test count: 2,400+ tests across 12 modules.
+    </overview>
+    
+    <modules_requiring_tests>
+      1. auth - Authentication, RBAC, God-mode impersonation
+      2. lms - Courses, Lessons, Progress, Certificates
+      3. community - Forums, Chat, Groups, Gamification
+      4. cms - Pages, Funnels, GrapesJS builder
+      5. builder - GrapesJS integration, Components, Export
+      6. ai - Content generation, RAG, BYOK
+      7. video-processor - Download, Transcribe, Clip, B-roll
+      8. content-studio - Airtable views, Automations
+      9. analytics - Dashboards, Cost tracking, Alerts
+      10. commerce - Subscriptions, Billing, Limits
+      11. realtime - PartyKit, Chat, Presence, Notifications
+      12. admin - God-mode dashboard, Tenant management
+    </modules_requiring_tests>
+    
+    <test_distribution_per_module>
+      <functional count="150">Core feature functionality, user journeys, API contracts</functional>
+      <style count="30">UI consistency, responsive behavior, animations, dark mode</style>
+      <integration count="15">Cross-module interactions, event bus communication</integration>
+      <performance count="5">Load times, concurrent users, edge cases</performance>
+    </test_distribution_per_module>
+    
+    <test_complexity_requirements>
+      - Minimum 25 tests per module MUST have 10+ steps each
+      - Simple tests (2-5 steps): Atomic operations, single API calls
+      - Medium tests (6-9 steps): Typical user flows
+      - Comprehensive tests (10+ steps): End-to-end journeys
+    </test_complexity_requirements>
+    
+    <priority_ordering>
+      P1 (Critical): Authentication, data isolation, billing, security
+      P2 (High): Core feature functionality, main user journeys
+      P3 (Medium): Secondary features, optimizations, edge cases
+      P4 (Low): Nice-to-have features, cosmetic issues
+    </priority_ordering>
+    
+    <feature_list_json_format>
+      {
+        "module": "module-id",
+        "name": "Module Display Name",
+        "testCount": 200,
+        "tests": [
+          {
+            "id": "module-001",
+            "category": "functional",
+            "priority": 1,
+            "description": "Brief description of what this test verifies",
+            "steps": [
+              "Step 1: Setup or navigation",
+              "Step 2: Action performed",
+              "Step 3: Verification of expected result"
+            ],
+            "passes": false
+          }
+        ]
+      }
+    </feature_list_json_format>
+    
+    <critical_rule>
+      NEVER remove or edit existing tests in feature_list.json.
+      Tests can ONLY be marked as passing (change "passes": false to "passes": true).
+      This ensures no functionality is accidentally dropped.
+    </critical_rule>
+  </testing_requirements>
+
+  <prerequisites>
+    <environment_setup>
+      - Node.js 20+ (Alpine-based Docker images for production)
+      - pnpm 8+ (recommended) or npm 10+
+      - Docker &amp; Docker Compose for local development
+      - Turborepo CLI (npx turbo)
+    </environment_setup>
+    
+    <external_accounts>
+      - Cloudflare Account (Workers, R2, Vectorize, Queues, for SaaS)
+      - Turso Account (Database groups, per-tenant databases)
+      - Clerk Account (Authentication, Organizations, Billing)
+      - OpenRouter Account (LLM API aggregation)
+    </external_accounts>
+    
+    <local_development>
+      - Turso CLI for local database emulation
+      - Wrangler CLI for Workers development
+      - PartyKit CLI for real-time development
+      - yt-dlp for video downloads (brew install yt-dlp)
+      - FFmpeg for video processing (brew install ffmpeg)
+    </local_development>
+
+    <proxy_setup>
+      Evomi Residential Proxies (for video downloads):
+      - Required for reliable YouTube/platform downloads
+      - Prevents IP blocks and rate limiting
+      - Proxy format: http://username:password@rp.evomi.com:1000
+      - Configure via EVOMI_* environment variables
+    </proxy_setup>
+  </prerequisites>
+
+  <subscription_tiers>
+    <starter price="$97/month">
+      <limits>
+        - 1 published course
+        - 100 enrolled students
+        - 5 GB storage
+        - 500 AI generations/month
+        - No video processing
+        - Basic community features
+        - No custom domain
+        - Community support only
+      </limits>
+    </starter>
+    
+    <growth price="$297/month">
+      <limits>
+        - Unlimited courses
+        - 1,000 enrolled students
+        - 50 GB storage
+        - 5,000 AI generations/month
+        - 60 minutes video processing/month
+        - Full community features
+        - A/B testing enabled
+        - Custom domain (1)
+        - Email support
+        - 99.5% SLA
+      </limits>
+    </growth>
+    
+    <enterprise price="$497/month">
+      <limits>
+        - Unlimited courses
+        - Unlimited students
+        - 500 GB storage
+        - 50,000 AI generations/month
+        - 300 minutes video processing/month
+        - Full community + RAG agent
+        - White-label branding
+        - API access
+        - Multiple custom domains
+        - Priority support + Slack
+        - 99.9% SLA
+      </limits>
+    </enterprise>
+    
+    <pass_through_costs>
+      - AI Features: BYOK only (users pay their provider directly, no platform markup)
+      - Evomi Proxies (video download): 3x markup on bandwidth
+      - Video Processing: Separate metered billing (Klap-equivalent pricing)
+      
+      Note: There is NO pooled AI API for users. All user AI features require BYOK.
+      Platform admin testing uses Anthropic API directly (not billed to users).
+    </pass_through_costs>
+  </subscription_tiers>
+
+  <core_features>
+    <multi_tenancy_infrastructure>
+      <turso_per_tenant_isolation>
+        - Each tenant gets a dedicated Turso database
+        - Created programmatically via Turso Platform API on signup
+        - Databases grouped for shared schema migrations
+        - True data isolation at infrastructure level (not just app filtering)
+        - Blast radius: Attack on Tenant A cannot affect Tenant B
+      </turso_per_tenant_isolation>
+      
+      <cloudflare_for_saas>
+        - Custom domain provisioning (e.g., academy.userbrand.com)
+        - Automatic SSL certificate provisioning
+        - DNS verification workflow
+        - Hostname-to-tenant mapping in platform database
+      </cloudflare_for_saas>
+      
+      <r2_storage_partitioning>
+        - Tenant-prefixed paths: /tenants/{tenantId}/files/...
+        - Signed URLs for secure access
+        - Per-tenant storage quota enforcement
+        - Zero egress fees (major cost advantage)
+      </r2_storage_partitioning>
+      
+      <tenant_provisioning_workflow>
+        1. User purchases plan (Stripe checkout via Clerk)
+        2. Webhook triggers Cloudflare Worker
+        3. Worker calls Turso API to create new database
+        4. Worker runs Drizzle migrations on new database
+        5. R2 prefix automatically created on first upload
+        6. Vectorize index created if RAG enabled
+        7. User redirected to onboarding wizard
+      </tenant_provisioning_workflow>
+    </multi_tenancy_infrastructure>
+
+    <auth_and_roles>
+      <hierarchical_rbac>
+        <god_mode>
+          - Platform owner with omniscient access
+          - Can impersonate any user across all tenants
+          - Access to platform-wide analytics and cost tracking
+          - Manages global feature flags and platform configuration
+          - All actions audit-logged to immutable log
+        </god_mode>
+        
+        <super_admin>
+          - White-label licensee / Tenant owner
+          - Full control over their branded instance
+          - God-mode over all admins and users within their tenant
+          - Manages billing, branding, and feature configuration
+          - Can create/manage admin accounts
+        </super_admin>
+        
+        <admin>
+          - Teachers, course creators, community managers
+          - Control over their assigned courses/content
+          - God-mode over their enrolled students
+          - Access to analytics for their content
+        </admin>
+        
+        <user>
+          - Students, community members, end users
+          - Consumes courses, participates in community
+          - Personal profile and progress tracking
+        </user>
+      </hierarchical_rbac>
+      
+      <clerk_organizations>
+        - Clerk Organization = Platform Tenant (1:1 mapping)
+        - Clerk Organization Roles = Admin/User hierarchy
+        - Clerk Organization Membership = Tenant access grants
+        - Leverage Clerk's invitation flows and role management
+      </clerk_organizations>
+      
+      <billing_data_minimization>
+        NEVER store in platform database:
+        - Credit card numbers
+        - Bank account details
+        - CVV/security codes
+        - Full payment method details
+        
+        ONLY store references:
+        - clerk_subscription_id
+        - subscription_tier
+        - subscription_status
+        - current_period_start/end
+        - usage_metrics (for metered billing)
+      </billing_data_minimization>
+    </auth_and_roles>
+
+    <god_mode_disable_feature>
+      <description>
+        Cryptographically secured, IRREVERSIBLE toggle to permanently disable 
+        god-mode oversight for specific tenants. Used in rare litigation, 
+        regulatory, or contractual scenarios where tenant demands complete autonomy.
+      </description>
+      
+      <workflow>
+        1. Super-admin requests disable (provides legal document reference)
+        2. God-mode admin reviews and approves
+        3. Both parties confirm via secure authentication
+        4. Immutable audit log entry created
+        5. All god-mode access tokens for tenant revoked
+        6. tenant.god_mode_enabled set to FALSE
+        7. Email confirmation sent to all parties
+      </workflow>
+      
+      <consequences>
+        - Platform owner permanently loses technical support access
+        - Tenant assumes full responsibility for their data
+        - Cannot be re-enabled without new legal agreement and code change
+        - Audit log permanently records the decision
+        - Tenant explicitly waives technical support privileges
+      </consequences>
+      
+      <implementation_note>
+        The disable function should require multi-factor authentication,
+        have a cooling-off period (e.g., 72 hours), and send multiple
+        confirmation requests before executing.
+      </implementation_note>
+    </god_mode_disable_feature>
+
+    <lms_module>
+      <course_hierarchy>
+        Course > Module > Section > Lesson
+        - Drag-and-drop reordering at each level
+        - Bulk operations (publish, unpublish, delete)
+      </course_hierarchy>
+      
+      <content_types>
+        - Video: Adaptive bitrate streaming, playback speed, captions
+        - Audio: Podcast-style, background playback, transcript sync
+        - Rich Text: Markdown/HTML editor, code blocks, embeds
+        - Quizzes: Multiple choice, fill-blank, essay (AI-graded), matching
+        - Assignments: Submission workflow, rubric grading, feedback
+        - Downloads: PDFs, worksheets, resource packs
+        - Live Sessions: Calendar integration, Zoom/Meet links
+      </content_types>
+      
+      <access_models>
+        - One-time purchase: Permanent access
+        - Subscription: Access while active
+        - Payment plan: Installments
+        - Free: No payment required
+        - Drip: Time-based or progress-based unlocking
+        - Prerequisite: Complete Course A before Course B
+        - Cohort: Fixed start date, synchronized progress
+        - Bundle: Multiple courses sold together
+      </access_models>
+      
+      <progress_tracking>
+        - Video: Percentage watched, segments viewed, resume position
+        - Quiz: Score, attempts, individual answers
+        - Time-on-task: Total seconds per lesson
+        - Completion: Auto-detect vs. manual mark complete
+        - Engagement: Access count, last accessed timestamp
+      </progress_tracking>
+      
+      <certificates>
+        - Auto-generated PDF on course completion
+        - Customizable templates per course
+        - Unique verification code (URL-verifiable)
+        - Instructor signature support
+        - Social sharing (LinkedIn, Twitter)
+      </certificates>
+    </lms_module>
+
+    <community_module>
+      <realtime_infrastructure>
+        PartyKit (acquired by Cloudflare, April 2024):
+        - No separate billing (standard Durable Objects pricing)
+        - Deploy to your own Cloudflare account
+        - WebSocket connections for chat and presence
+        - Built-in reconnection and buffering
+      </realtime_infrastructure>
+      
+      <structure>
+        - Central Feed: Activity stream across community
+        - Discussion Forums: Categories > Threads > Replies
+        - Groups: Course-specific, interest-based, VIP/alumni
+        - Chat: Public channels + Direct messages
+        - Events: Scheduled calls, AMAs, challenges
+        - Member Directory: Searchable profiles, expertise tags
+      </structure>
+      
+      <gamification>
+        - Reputation Points: Earned through engagement
+        - Achievement Badges: Milestone-based awards
+        - Leaderboards: Weekly/monthly rankings
+        - Streaks: Consecutive days of engagement
+        - Levels: Point thresholds unlock privileges
+      </gamification>
+      
+      <notifications>
+        - Channels: Email, Push, In-App
+        - Granular preferences per notification type
+        - Digest options: Realtime, Daily, Weekly
+        - Do-not-disturb scheduling
+      </notifications>
+    </community_module>
+
+    <cms_and_funnels>
+      <visual_builder>
+        GrapesJS integration for three contexts:
+        - Web Pages: Full CSS, responsive, custom JS
+        - Emails: Email-client safe CSS, table layout, inline styles
+        - Ebooks: Fixed dimensions, print-oriented, page breaks
+      </visual_builder>
+      
+      <component_library>
+        - Hero sections (multiple layouts)
+        - Testimonial blocks (carousel, grid, single)
+        - Pricing tables (comparison, single tier)
+        - Countdown timers (evergreen, deadline)
+        - Video embeds (YouTube, Vimeo, self-hosted)
+        - Image galleries (lightbox, carousel, masonry)
+        - FAQ accordions
+        - Form builders (multi-step supported)
+        - Payment widgets (Clerk/Stripe integration)
+        - Social proof notifications
+      </component_library>
+      
+      <funnel_logic>
+        - Landing Page > Opt-in > Sales Page > Order Form
+        - Upsell/Downsell branching
+        - Order bumps
+        - Thank you page variants
+        - A/B testing with traffic splitting
+        - Statistical significance calculation
+      </funnel_logic>
+      
+      <headless_api>
+        - Programmatic page creation via JSON
+        - Template instantiation
+        - Content population
+        - Remote publishing
+        - Version history
+      </headless_api>
+      
+      <asset_library>
+        - Shared media across web/email/print contexts
+        - Brand kit: Logos, colors, fonts
+        - Saved blocks: Reusable components
+        - Tenant-scoped isolation
+      </asset_library>
+    </cms_and_funnels>
+
+    <video_processing_pipeline>
+      <workflow>
+        1. User pastes video URL (YouTube, Vimeo, etc.)
+        2. System validates user's video processing credits
+        3. Job queued in Cloudflare Queues
+        4. YT-DLP downloads video (via Evomi residential proxies)
+        5. Whisper transcribes audio with timestamps
+        6. LLM analyzes transcript for clip-worthy moments
+        7. FFmpeg generates clips with captions
+        8. Optional: Flux.1 generates b-roll images
+        9. Optional: Image-to-video for animated b-roll
+        10. PartyKit notification when processing complete
+        11. User reviews clips in Airtable-style interface
+      </workflow>
+      
+      <components>
+        - YT-DLP: Video download (self-hosted, free)
+        - Octobrowser: Browser fingerprint spoofing
+        - Evomi Proxies: Residential proxy rotation (3x markup)
+        - FFmpeg: Video manipulation (self-hosted, free)
+        - Whisper: Speech-to-text (via OpenRouter)
+        - Flux.1: AI image generation for b-roll
+        - LLM: Clip selection, b-roll timing decisions
+      </components>
+      
+      <retention_policy>
+        - 30-day auto-deletion of processed videos
+        - Cloudflare Cron Trigger runs daily
+        - Users notified before deletion
+        - Optional: Pay for extended retention
+      </retention_policy>
+      
+      <pricing>
+        Separate metered billing (not included in subscription tiers):
+        - Per-minute rate for source video length
+        - Additional charge for b-roll generation
+        - Klap-equivalent pricing model
+      </pricing>
+    </video_processing_pipeline>
+
+    <ai_content_engine>
+      <rag_agent>
+        - Per-tenant Cloudflare Vectorize index
+        - Course content chunked and embedded
+        - @Agent mention triggers RAG query
+        - Grounded responses with source citations
+        - Community owner configurable system prompt
+        - Only available with unified course access (all-access membership)
+      </rag_agent>
+      
+      <byok_support>
+        Bring Your Own Key architecture (REQUIRED for all user AI features):
+        
+        Supported BYOK Providers:
+        - OpenRouter (aggregates multiple models)
+        - Anthropic (Claude models direct)
+        - OpenAI (GPT models direct)
+        
+        Implementation:
+        - Users MUST provide their own API key to use AI features
+        - Keys encrypted at rest (AES-256), never logged
+        - No platform pooled API for users (BYOK only)
+        - Provider selection in user settings
+        
+        Platform Admin/Testing:
+        - Uses Anthropic API directly (ANTHROPIC_API_KEY env var)
+        - Default model: claude-3-5-haiku-20241022 (fast, cheap)
+        - Complex tasks: claude-sonnet-4-20250514
+        - NOT exposed to end users
+      </byok_support>
+      
+      <generative_tools>
+        All generative tools require user BYOK configuration:
+        
+        - Course outline generator (from topic/transcript)
+        - Email sequence writer (welcome, nurture, launch)
+        - Quiz question generator (from lesson content)
+        - Landing page copywriter
+        - Community post suggestions
+        - RAG agent queries
+        
+        User Flow:
+        1. User navigates to Settings → AI Configuration
+        2. Selects provider (OpenRouter / Anthropic / OpenAI)
+        3. Enters API key (validated on save)
+        4. Selects preferred model from provider's options
+        5. AI features become available
+        
+        Without BYOK configured:
+        - AI features show "Configure AI" prompt
+        - Features are disabled, not errored
+        - Clear instructions to set up BYOK
+      </generative_tools>
+      
+      <rate_limiting>
+        Since AI is BYOK-only, rate limiting is for platform protection, not billing:
+        
+        Request Limits (prevent abuse):
+        - Starter: 100 AI requests/hour
+        - Growth: 500 AI requests/hour  
+        - Enterprise: 2,000 AI requests/hour
+        
+        Note: Users pay their AI provider directly based on usage.
+        These limits prevent runaway loops or abuse, not monetization.
+        
+        Graceful handling when exceeded:
+        - "Rate limit reached, please wait X minutes"
+        - No upgrade prompt (since BYOK means they control costs)
+        - Auto-restore after cooldown
+      </rate_limiting>
+    </ai_content_engine>
+
+    <analytics_suite>
+      <financial_analytics>
+        - Cost tracking: Turso rows, LLM tokens, storage, bandwidth
+        - Revenue tracking: Subscriptions, one-time purchases
+        - Per-tenant cost attribution
+        - Profit margin calculations
+        - Cost projection modeling
+      </financial_analytics>
+      
+      <conversion_analytics>
+        - Funnel step drop-off rates
+        - A/B test results with statistical significance
+        - Page views, time on page, scroll depth
+        - Form abandonment analysis
+        - Click-through rates by element
+      </conversion_analytics>
+      
+      <engagement_analytics>
+        - Student progress distributions
+        - Course completion rates
+        - Community participation heatmaps
+        - Content engagement patterns
+        - Churn prediction indicators
+      </engagement_analytics>
+      
+      <migration_triggers>
+        God-mode alerts for infrastructure decisions:
+        
+        Turso Monthly Spend Thresholds:
+        - $5,000: Begin cost modeling vs. self-hosted
+        - $15,000: Commission architecture proposal
+        - $30,000: Active migration planning
+        
+        Specific Resource Alerts:
+        - Database storage > 500 GB
+        - Function calls > 100M/month
+        - File bandwidth > 500 GB/month
+        - First enterprise customer with SLA requirement
+        - Multi-tenant outage incident
+      </migration_triggers>
+    </analytics_suite>
+  </core_features>
+
+  <security_and_resilience>
+    <blast_radius_isolation>
+      The Turso per-tenant architecture ensures:
+      - Attack on Tenant A affects ONLY Tenant A
+      - Resource exhaustion is tenant-scoped
+      - Database corruption is isolated
+      - No cross-tenant data leakage possible at infrastructure level
+      
+      Per-tenant isolated resources:
+      - Turso database
+      - R2 storage prefix
+      - Vectorize index
+      - PartyKit room namespaces
+    </blast_radius_isolation>
+    
+    <circuit_breaker_pattern>
+      Automatic tenant isolation under stress:
+      
+      1. Track failures per tenant (error rate, latency)
+      2. Trip circuit after threshold (e.g., 10 failures in 1 minute)
+      3. Open state: Return error immediately, don't hit database
+      4. Half-open state: Allow single request to test recovery
+      5. Closed state: Normal operation resumed
+      
+      Circuit state stored in Cloudflare KV or Durable Objects.
+    </circuit_breaker_pattern>
+    
+    <edge_rate_limiting>
+      Implemented in Cloudflare Workers:
+      
+      Per-Tenant Limits:
+      - Prevents one tenant's traffic spike affecting others
+      - Separate counters per tenant
+      - Configurable per subscription tier
+      
+      Per-User Limits:
+      - Prevents one user affecting entire tenant
+      - Separate counters per user within tenant
+      - Stricter limits for unauthenticated requests
+      
+      Response Headers:
+      - X-RateLimit-Remaining
+      - X-RateLimit-Reset
+      - Retry-After (on 429)
+    </edge_rate_limiting>
+    
+    <graceful_degradation>
+      When limits exceeded, preserve core functionality:
+      
+      AI Limit Exceeded:
+      - Disabled: AI generation, suggestions, RAG queries
+      - Preserved: Course access, community, basic CMS
+      - Message: "AI features temporarily unavailable"
+      - Auto-restore: After cooldown or billing reset
+      
+      Storage Limit Exceeded:
+      - Disabled: File upload, video upload
+      - Preserved: All read operations, course access
+      - Message: "Storage limit reached. Delete files or upgrade."
+      - No auto-restore (requires action)
+      
+      Video Processing Limit:
+      - Jobs queued, not rejected
+      - Clear queue position indicator
+      - Option to purchase additional credits
+    </graceful_degradation>
+    
+    <ddos_protection>
+      Cloudflare provides edge protection:
+      - Volumetric attacks absorbed at edge (280+ Tbps capacity)
+      - WAF rules for application-layer attacks
+      - Bot detection and challenge
+      - Per-hostname rate limiting
+      
+      Platform provides origin protection:
+      - Turso not directly exposed (requests via Workers only)
+      - Tenant-aware rate limiting at application level
+      - Circuit breakers prevent cascade failures
+      - Anomaly detection for unusual patterns
+    </ddos_protection>
+  </security_and_resilience>
+
+  <database_schema>
+    <platform_level_tables>
+      <tenants>
+        id              UUID PRIMARY KEY
+        clerk_org_id    VARCHAR UNIQUE NOT NULL
+        name            VARCHAR NOT NULL
+        slug            VARCHAR UNIQUE NOT NULL
+        turso_db_url    VARCHAR NOT NULL
+        r2_prefix       VARCHAR NOT NULL
+        vectorize_index VARCHAR
+        subscription_tier ENUM('starter', 'growth', 'enterprise')
+        subscription_status ENUM('active', 'past_due', 'canceled', 'trialing')
+        god_mode_enabled BOOLEAN DEFAULT TRUE
+        created_at      TIMESTAMP DEFAULT NOW()
+        updated_at      TIMESTAMP
+      </tenants>
+      
+      <custom_domains>
+        id                  UUID PRIMARY KEY
+        tenant_id           UUID REFERENCES tenants(id)
+        hostname            VARCHAR UNIQUE NOT NULL
+        cloudflare_id       VARCHAR
+        verification_record VARCHAR
+        status              ENUM('pending', 'active', 'failed')
+        created_at          TIMESTAMP DEFAULT NOW()
+      </custom_domains>
+      
+      <usage_metrics>
+        id              UUID PRIMARY KEY
+        tenant_id       UUID REFERENCES tenants(id)
+        resource_type   ENUM('turso_reads', 'turso_writes', 'llm_tokens', 'storage_bytes', 'bandwidth_bytes', 'video_minutes')
+        quantity        BIGINT NOT NULL
+        cost_estimate   DECIMAL(10, 4)
+        timestamp       TIMESTAMP DEFAULT NOW()
+      </usage_metrics>
+      
+      <audit_logs>
+        id              UUID PRIMARY KEY
+        actor_id        VARCHAR NOT NULL
+        actor_role      ENUM('god_mode', 'super_admin', 'admin', 'user')
+        action_type     VARCHAR NOT NULL
+        target_tenant_id UUID
+        target_user_id  VARCHAR
+        details_json    JSONB
+        ip_address      VARCHAR
+        user_agent      VARCHAR
+        timestamp       TIMESTAMP DEFAULT NOW()
+        
+        -- APPEND-ONLY: No UPDATE or DELETE allowed
+        -- God-mode cannot modify these records
+      </audit_logs>
+      
+      <circuit_breakers>
+        tenant_id       UUID PRIMARY KEY REFERENCES tenants(id)
+        status          ENUM('closed', 'open', 'half_open') DEFAULT 'closed'
+        failure_count   INTEGER DEFAULT 0
+        last_failure    TIMESTAMP
+        reset_at        TIMESTAMP
+      </circuit_breakers>
+    </platform_level_tables>
+    
+    <tenant_level_tables>
+      <users>
+        id                VARCHAR PRIMARY KEY  -- Clerk user ID
+        email             VARCHAR UNIQUE NOT NULL
+        name              VARCHAR
+        avatar_url        VARCHAR
+        role              ENUM('super_admin', 'admin', 'user')
+        reputation_points INTEGER DEFAULT 0
+        streak_days       INTEGER DEFAULT 0
+        joined_at         TIMESTAMP DEFAULT NOW()
+        last_active_at    TIMESTAMP
+      </users>
+      
+      <courses>
+        id              UUID PRIMARY KEY
+        title           VARCHAR NOT NULL
+        slug            VARCHAR UNIQUE NOT NULL
+        description     TEXT
+        thumbnail_url   VARCHAR
+        instructor_id   VARCHAR REFERENCES users(id)
+        status          ENUM('draft', 'published', 'archived')
+        pricing_model   ENUM('free', 'one_time', 'subscription', 'payment_plan')
+        price_cents     INTEGER
+        drip_enabled    BOOLEAN DEFAULT FALSE
+        drip_settings   JSONB
+        created_at      TIMESTAMP DEFAULT NOW()
+        published_at    TIMESTAMP
+      </courses>
+      
+      <course_modules>
+        id              UUID PRIMARY KEY
+        course_id       UUID REFERENCES courses(id) ON DELETE CASCADE
+        title           VARCHAR NOT NULL
+        position        INTEGER NOT NULL
+      </course_modules>
+      
+      <course_sections>
+        id              UUID PRIMARY KEY
+        module_id       UUID REFERENCES course_modules(id) ON DELETE CASCADE
+        title           VARCHAR NOT NULL
+        position        INTEGER NOT NULL
+      </course_sections>
+      
+      <lessons>
+        id              UUID PRIMARY KEY
+        section_id      UUID REFERENCES course_sections(id) ON DELETE CASCADE
+        title           VARCHAR NOT NULL
+        content_type    ENUM('video', 'audio', 'text', 'quiz', 'assignment', 'download')
+        content_json    JSONB
+        video_url       VARCHAR
+        duration_seconds INTEGER
+        position        INTEGER NOT NULL
+        is_preview      BOOLEAN DEFAULT FALSE
+      </lessons>
+      
+      <enrollments>
+        id              UUID PRIMARY KEY
+        user_id         VARCHAR REFERENCES users(id)
+        course_id       UUID REFERENCES courses(id)
+        status          ENUM('active', 'completed', 'expired', 'refunded')
+        enrolled_at     TIMESTAMP DEFAULT NOW()
+        expires_at      TIMESTAMP
+        completed_at    TIMESTAMP
+        UNIQUE(user_id, course_id)
+      </enrollments>
+      
+      <lesson_progress>
+        id                  UUID PRIMARY KEY
+        user_id             VARCHAR REFERENCES users(id)
+        lesson_id           UUID REFERENCES lessons(id)
+        video_watched_pct   DECIMAL(5, 2) DEFAULT 0
+        video_segments      JSONB  -- Array of [start, end] timestamps watched
+        last_position       INTEGER DEFAULT 0
+        time_spent_seconds  INTEGER DEFAULT 0
+        quiz_score          DECIMAL(5, 2)
+        quiz_attempts       INTEGER DEFAULT 0
+        is_completed        BOOLEAN DEFAULT FALSE
+        completed_at        TIMESTAMP
+        updated_at          TIMESTAMP DEFAULT NOW()
+        UNIQUE(user_id, lesson_id)
+      </lesson_progress>
+      
+      <certificates>
+        id              UUID PRIMARY KEY
+        user_id         VARCHAR REFERENCES users(id)
+        course_id       UUID REFERENCES courses(id)
+        certificate_url VARCHAR NOT NULL
+        verification_code VARCHAR UNIQUE NOT NULL
+        issued_at       TIMESTAMP DEFAULT NOW()
+      </certificates>
+      
+      <community_categories>
+        id              UUID PRIMARY KEY
+        name            VARCHAR NOT NULL
+        slug            VARCHAR UNIQUE NOT NULL
+        description     TEXT
+        position        INTEGER NOT NULL
+      </community_categories>
+      
+      <community_threads>
+        id              UUID PRIMARY KEY
+        category_id     UUID REFERENCES community_categories(id)
+        author_id       VARCHAR REFERENCES users(id)
+        title           VARCHAR NOT NULL
+        is_pinned       BOOLEAN DEFAULT FALSE
+        is_locked       BOOLEAN DEFAULT FALSE
+        view_count      INTEGER DEFAULT 0
+        created_at      TIMESTAMP DEFAULT NOW()
+        last_activity_at TIMESTAMP DEFAULT NOW()
+      </community_threads>
+      
+      <community_posts>
+        id              UUID PRIMARY KEY
+        thread_id       UUID REFERENCES community_threads(id) ON DELETE CASCADE
+        author_id       VARCHAR REFERENCES users(id)
+        parent_id       UUID REFERENCES community_posts(id)  -- For nested replies
+        content_json    JSONB NOT NULL
+        upvotes         INTEGER DEFAULT 0
+        created_at      TIMESTAMP DEFAULT NOW()
+        edited_at       TIMESTAMP
+      </community_posts>
+      
+      <community_groups>
+        id              UUID PRIMARY KEY
+        name            VARCHAR NOT NULL
+        slug            VARCHAR UNIQUE NOT NULL
+        description     TEXT
+        type            ENUM('course', 'interest', 'vip')
+        course_id       UUID REFERENCES courses(id)  -- If course-specific
+        member_count    INTEGER DEFAULT 0
+        created_at      TIMESTAMP DEFAULT NOW()
+      </community_groups>
+      
+      <group_memberships>
+        id              UUID PRIMARY KEY
+        group_id        UUID REFERENCES community_groups(id) ON DELETE CASCADE
+        user_id         VARCHAR REFERENCES users(id)
+        role            ENUM('member', 'moderator', 'owner')
+        joined_at       TIMESTAMP DEFAULT NOW()
+        UNIQUE(group_id, user_id)
+      </group_memberships>
+      
+      <badges>
+        id              UUID PRIMARY KEY
+        name            VARCHAR NOT NULL
+        description     TEXT
+        icon_url        VARCHAR
+        criteria_json   JSONB  -- Conditions to earn badge
+      </badges>
+      
+      <user_badges>
+        id              UUID PRIMARY KEY
+        user_id         VARCHAR REFERENCES users(id)
+        badge_id        UUID REFERENCES badges(id)
+        earned_at       TIMESTAMP DEFAULT NOW()
+        UNIQUE(user_id, badge_id)
+      </user_badges>
+      
+      <funnels>
+        id              UUID PRIMARY KEY
+        name            VARCHAR NOT NULL
+        slug            VARCHAR UNIQUE NOT NULL
+        domain_mapping  VARCHAR  -- Custom domain for this funnel
+        status          ENUM('draft', 'active', 'paused')
+        steps_json      JSONB  -- Visual flow definition
+        created_at      TIMESTAMP DEFAULT NOW()
+      </funnels>
+      
+      <funnel_pages>
+        id                  UUID PRIMARY KEY
+        funnel_id           UUID REFERENCES funnels(id) ON DELETE CASCADE
+        name                VARCHAR NOT NULL
+        slug                VARCHAR NOT NULL
+        page_type           ENUM('landing', 'optin', 'sales', 'checkout', 'upsell', 'downsell', 'thankyou')
+        grapesjs_json       JSONB NOT NULL  -- GrapesJS project data
+        custom_css          TEXT
+        custom_js           TEXT
+        seo_title           VARCHAR
+        seo_description     TEXT
+        position            INTEGER NOT NULL
+        UNIQUE(funnel_id, slug)
+      </funnel_pages>
+      
+      <ab_tests>
+        id              UUID PRIMARY KEY
+        page_id         UUID REFERENCES funnel_pages(id) ON DELETE CASCADE
+        name            VARCHAR NOT NULL
+        status          ENUM('draft', 'running', 'paused', 'completed')
+        goal_metric     ENUM('pageview', 'click', 'submission', 'purchase')
+        goal_selector   VARCHAR  -- CSS selector for click/submission goals
+        started_at      TIMESTAMP
+        ended_at        TIMESTAMP
+        winner_variant  VARCHAR
+      </ab_tests>
+      
+      <ab_variants>
+        id              UUID PRIMARY KEY
+        test_id         UUID REFERENCES ab_tests(id) ON DELETE CASCADE
+        name            VARCHAR NOT NULL
+        traffic_pct     INTEGER NOT NULL  -- 0-100, must sum to 100 across variants
+        grapesjs_json   JSONB NOT NULL
+        visitors        INTEGER DEFAULT 0
+        conversions     INTEGER DEFAULT 0
+      </ab_variants>
+      
+      <video_jobs>
+        id              UUID PRIMARY KEY
+        user_id         VARCHAR REFERENCES users(id)
+        source_url      VARCHAR NOT NULL
+        source_platform ENUM('youtube', 'vimeo', 'tiktok', 'other')
+        status          ENUM('queued', 'downloading', 'transcribing', 'analyzing', 'clipping', 'completed', 'failed')
+        error_message   TEXT
+        storage_key     VARCHAR  -- R2 key for processed files
+        transcript_json JSONB
+        clips_json      JSONB  -- Generated clip metadata
+        created_at      TIMESTAMP DEFAULT NOW()
+        expires_at      TIMESTAMP  -- 30 days from creation
+        processing_time_seconds INTEGER
+      </video_jobs>
+      
+      <ai_usage>
+        id              UUID PRIMARY KEY
+        user_id         VARCHAR REFERENCES users(id)
+        provider        ENUM('openrouter', 'anthropic', 'openai')
+        model           VARCHAR NOT NULL
+        operation       VARCHAR NOT NULL  -- e.g., 'content_generation', 'rag_query'
+        input_tokens    INTEGER NOT NULL
+        output_tokens   INTEGER NOT NULL
+        cost_cents      INTEGER  -- NULL for BYOK
+        timestamp       TIMESTAMP DEFAULT NOW()
+      </ai_usage>
+      
+      <notification_preferences>
+        user_id             VARCHAR PRIMARY KEY REFERENCES users(id)
+        email_enabled       BOOLEAN DEFAULT TRUE
+        push_enabled        BOOLEAN DEFAULT TRUE
+        in_app_enabled      BOOLEAN DEFAULT TRUE
+        digest_frequency    ENUM('realtime', 'daily', 'weekly', 'none') DEFAULT 'realtime'
+        mentions            ENUM('all', 'none') DEFAULT 'all'
+        replies             ENUM('all', 'direct_only', 'none') DEFAULT 'all'
+        new_content         ENUM('all', 'followed_only', 'none') DEFAULT 'followed_only'
+      </notification_preferences>
+
+      <user_ai_config>
+        user_id             VARCHAR PRIMARY KEY REFERENCES users(id)
+        provider            ENUM('openrouter', 'anthropic', 'openai')
+        api_key_encrypted   BYTEA NOT NULL  -- AES-256 encrypted
+        api_key_hint        VARCHAR(8)  -- Last 4 chars for display: "...xY7z"
+        preferred_model     VARCHAR  -- e.g., 'claude-3-5-haiku-20241022'
+        created_at          TIMESTAMP DEFAULT NOW()
+        updated_at          TIMESTAMP
+        last_validated_at   TIMESTAMP  -- Last successful API call
+      </user_ai_config>
+      
+      <rag_agent_config>
+        id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+        enabled         BOOLEAN DEFAULT FALSE
+        name            VARCHAR DEFAULT 'Agent'
+        avatar_url      VARCHAR
+        system_prompt   TEXT
+        include_courses BOOLEAN DEFAULT TRUE
+        include_community BOOLEAN DEFAULT FALSE
+        max_response_length INTEGER DEFAULT 1000
+        cite_sources    BOOLEAN DEFAULT TRUE
+        confidence_threshold DECIMAL(3, 2) DEFAULT 0.70
+        queries_per_user_day INTEGER DEFAULT 20
+      </rag_agent_config>
+    </tenant_level_tables>
+  </database_schema>
+
+  <api_endpoints>
+    <admin_endpoints>
+      GET    /api/admin/tenants              -- List all tenants (god-mode)
+      GET    /api/admin/tenants/:id          -- Get tenant details
+      POST   /api/admin/tenants              -- Create/provision new tenant
+      DELETE /api/admin/tenants/:id          -- Delete tenant (with confirmation)
+      POST   /api/admin/tenants/:id/impersonate  -- Start impersonation session
+      POST   /api/admin/tenants/:id/disable-god-mode  -- Irreversible disable
+      GET    /api/admin/analytics            -- Platform-wide analytics
+      GET    /api/admin/costs                -- Cost tracking dashboard
+      GET    /api/admin/audit-logs           -- Audit log viewer
+    </admin_endpoints>
+    
+    <auth_endpoints>
+      GET    /api/auth/me                    -- Current user info
+      POST   /api/auth/switch-tenant         -- Switch tenant context
+      GET    /api/auth/permissions           -- Current permissions
+    </auth_endpoints>
+    
+    <lms_endpoints>
+      GET    /api/courses                    -- List courses
+      POST   /api/courses                    -- Create course
+      GET    /api/courses/:id                -- Get course details
+      PUT    /api/courses/:id                -- Update course
+      DELETE /api/courses/:id                -- Delete course
+      POST   /api/courses/:id/publish        -- Publish course
+      
+      GET    /api/courses/:id/modules        -- List modules
+      POST   /api/courses/:id/modules        -- Create module
+      PUT    /api/modules/:id                -- Update module
+      DELETE /api/modules/:id                -- Delete module
+      POST   /api/modules/reorder            -- Reorder modules
+      
+      GET    /api/modules/:id/sections       -- List sections
+      POST   /api/modules/:id/sections       -- Create section
+      
+      GET    /api/sections/:id/lessons       -- List lessons
+      POST   /api/sections/:id/lessons       -- Create lesson
+      GET    /api/lessons/:id                -- Get lesson content
+      PUT    /api/lessons/:id                -- Update lesson
+      
+      POST   /api/courses/:id/enroll         -- Enroll in course
+      GET    /api/enrollments                -- User's enrollments
+      
+      GET    /api/lessons/:id/progress       -- Get progress
+      PUT    /api/lessons/:id/progress       -- Update progress
+      POST   /api/lessons/:id/complete       -- Mark complete
+      
+      GET    /api/certificates               -- User's certificates
+      GET    /api/certificates/:id           -- Get certificate
+      GET    /api/certificates/:id/download  -- Download PDF
+      GET    /api/certificates/verify/:code  -- Public verification
+    </lms_endpoints>
+    
+    <community_endpoints>
+      GET    /api/community/feed             -- Activity feed
+      
+      GET    /api/community/categories       -- List categories
+      POST   /api/community/categories       -- Create category (admin)
+      
+      GET    /api/community/threads          -- List threads
+      POST   /api/community/threads          -- Create thread
+      GET    /api/community/threads/:id      -- Get thread with posts
+      PUT    /api/community/threads/:id      -- Update thread
+      DELETE /api/community/threads/:id      -- Delete thread
+      POST   /api/community/threads/:id/pin  -- Pin thread (admin)
+      POST   /api/community/threads/:id/lock -- Lock thread (admin)
+      
+      POST   /api/community/posts            -- Create post/reply
+      PUT    /api/community/posts/:id        -- Edit post
+      DELETE /api/community/posts/:id        -- Delete post
+      POST   /api/community/posts/:id/upvote -- Upvote post
+      
+      GET    /api/community/groups           -- List groups
+      POST   /api/community/groups           -- Create group
+      GET    /api/community/groups/:id       -- Get group details
+      POST   /api/community/groups/:id/join  -- Join group
+      POST   /api/community/groups/:id/leave -- Leave group
+      
+      GET    /api/community/members          -- Member directory
+      GET    /api/community/leaderboard      -- Points leaderboard
+      
+      GET    /api/notifications              -- User notifications
+      PUT    /api/notifications/preferences  -- Update preferences
+      POST   /api/notifications/mark-read    -- Mark as read
+      
+      -- WebSocket endpoints
+      WS     /partykit/chat/:roomId          -- Chat room connection
+      WS     /partykit/presence/:roomId      -- Presence tracking
+    </community_endpoints>
+    
+    <cms_endpoints>
+      GET    /api/funnels                    -- List funnels
+      POST   /api/funnels                    -- Create funnel
+      GET    /api/funnels/:id                -- Get funnel details
+      PUT    /api/funnels/:id                -- Update funnel
+      DELETE /api/funnels/:id                -- Delete funnel
+      
+      GET    /api/funnels/:id/pages          -- List pages
+      POST   /api/funnels/:id/pages          -- Create page
+      GET    /api/pages/:id                  -- Get page content
+      PUT    /api/pages/:id                  -- Update page (GrapesJS JSON)
+      DELETE /api/pages/:id                  -- Delete page
+      POST   /api/pages/:id/publish          -- Publish page
+      POST   /api/pages/:id/duplicate        -- Duplicate page
+      
+      GET    /api/pages/:id/ab-tests         -- List A/B tests
+      POST   /api/pages/:id/ab-tests         -- Create A/B test
+      PUT    /api/ab-tests/:id               -- Update test
+      POST   /api/ab-tests/:id/start         -- Start test
+      POST   /api/ab-tests/:id/stop          -- Stop test
+      GET    /api/ab-tests/:id/results       -- Get results
+      
+      GET    /api/assets                     -- List assets
+      POST   /api/assets/upload              -- Upload asset
+      DELETE /api/assets/:id                 -- Delete asset
+      
+      GET    /api/templates                  -- List templates
+      POST   /api/templates                  -- Save as template
+    </cms_endpoints>
+    
+    <video_endpoints>
+      POST   /api/video/process              -- Submit video URL
+      GET    /api/video/jobs                 -- List user's jobs
+      GET    /api/video/jobs/:id             -- Get job status
+      GET    /api/video/jobs/:id/clips       -- Get generated clips
+      DELETE /api/video/jobs/:id             -- Cancel/delete job
+      POST   /api/video/jobs/:id/extend      -- Extend retention (paid)
+      GET    /api/video/credits              -- Check remaining credits
+    </video_endpoints>
+    
+    <ai_endpoints>
+      POST   /api/ai/generate                -- General content generation
+      POST   /api/ai/generate/outline        -- Course outline
+      POST   /api/ai/generate/emails         -- Email sequence
+      POST   /api/ai/generate/quiz           -- Quiz questions
+      POST   /api/ai/generate/copy           -- Landing page copy
+      POST   /api/ai/config/validate        -- Test API key validity
+      
+      POST   /api/ai/rag/query               -- RAG agent query
+      GET    /api/ai/rag/config              -- Get RAG config
+      PUT    /api/ai/rag/config              -- Update RAG config
+      POST   /api/ai/rag/reindex             -- Trigger reindexing
+      
+      GET    /api/ai/usage                   -- AI usage stats
+
+      GET    /api/ai/config                 -- Get user's AI configuration
+      DELETE /api/ai/config                 -- Remove BYOK credentials  
+      POST   /api/ai/config/validate        -- Test API key validity
+      GET    /api/ai/config/models          -- List available models for provider
+    </ai_endpoints>
+    
+    <analytics_endpoints>
+      GET    /api/analytics/dashboard        -- Main dashboard data
+      GET    /api/analytics/courses/:id      -- Course analytics
+      GET    /api/analytics/funnels/:id      -- Funnel analytics
+      GET    /api/analytics/community        -- Community engagement
+      GET    /api/analytics/revenue          -- Revenue metrics
+      GET    /api/analytics/costs            -- Cost breakdown
+      GET    /api/analytics/projections      -- Cost projections
+    </analytics_endpoints>
+    
+    <settings_endpoints>
+      GET    /api/settings/tenant            -- Tenant settings
+      PUT    /api/settings/tenant            -- Update settings
+      GET    /api/settings/branding          -- Branding config
+      PUT    /api/settings/branding          -- Update branding
+      GET    /api/settings/domains           -- Custom domains
+      POST   /api/settings/domains           -- Add domain
+      DELETE /api/settings/domains/:id       -- Remove domain
+      POST   /api/settings/domains/:id/verify -- Verify domain
+    </settings_endpoints>
+    
+    <public_endpoints>
+      GET    /p/:tenantSlug/:pageSlug        -- Public page render
+      POST   /p/:tenantSlug/webhook/stripe   -- Stripe webhook
+      GET    /verify/:code                   -- Certificate verification
+    </public_endpoints>
+  </api_endpoints>
+
+  <ui_layout>
+    <app_shell>
+      - Responsive sidebar navigation (collapsible on mobile)
+      - Top bar with search, notifications, user menu
+      - Breadcrumb navigation
+      - Context switcher dropdown for Super-Admins (switch tenant views)
+      - Dark mode toggle
+    </app_shell>
+    
+    <god_mode_dashboard>
+      - Global tenant map/list with health indicators
+      - Revenue charts (MRR, churn, growth)
+      - System health monitoring
+      - Cost tracking vs revenue
+      - Migration trigger alerts (highlighted when thresholds approached)
+      - Audit log viewer
+      - Impersonation interface
+    </god_mode_dashboard>
+    
+    <tenant_admin_dashboard>
+      - Overview stats (students, courses, revenue)
+      - Recent activity feed
+      - Quick actions (create course, invite admin)
+      - Stripe connectivity status
+      - Domain settings
+      - Team management
+      - Branding customization
+    </tenant_admin_dashboard>
+    
+    <builder_interface>
+      - GrapesJS canvas: Center stage, drag-and-drop
+      - Block Manager: Right sidebar, categorized components
+      - Style Manager: Right sidebar, CSS properties panel
+      - Layer Manager: Left sidebar, DOM tree view
+      - Asset Manager: Modal, media library
+      - Context Toggle: Tabs for Desktop/Tablet/Mobile preview
+      - Email/Ebook mode: Adjusted constraints per context
+      - Top toolbar: Save, Preview, Publish, Settings
+    </builder_interface>
+    
+    <course_editor>
+      - Left sidebar: Course structure tree (modules/sections/lessons)
+      - Center: Lesson content editor (varies by content type)
+      - Right sidebar: Lesson settings (drip, preview, etc.)
+      - Top toolbar: Course settings, Preview as student, Publish
+    </course_editor>
+    
+    <student_course_player>
+      - Video player: Top/center, with transcript toggle
+      - Lesson navigation: Left sidebar, progress indicators
+      - Lesson content: Below video, rich text/downloads
+      - Progress bar: Top of page
+      - Next/Previous buttons: Bottom navigation
+      - Mobile: Full-screen video, swipe navigation
+    </student_course_player>
+    
+    <community_hub>
+      - Central feed: Activity stream, infinite scroll
+      - Left sidebar: Categories, Groups, Navigation
+      - Right sidebar: Leaderboard, Upcoming events, Online members
+      - Thread view: OP at top, replies below, nested threading
+      - Chat: Slide-over panel or dedicated page
+    </community_hub>
+    
+    <video_processor_ui>
+      - URL input: Prominent paste field
+      - Job queue: List of processing jobs with status
+      - Clip review: Airtable-style grid view
+        - Columns: Thumbnail, Title, Duration, Score, Status
+        - Views: Grid, Kanban (by status), Calendar (by scheduled post)
+      - Clip editor: Trim, add captions, select b-roll
+      - Export options: Platform-specific formats
+    </video_processor_ui>
+  </ui_layout>
+
+  <design_system>
+    <color_palette>
+      CSS Variables for easy white-labeling:
+      --color-primary: Brand primary (customizable)
+      --color-primary-foreground: Text on primary
+      --color-secondary: Brand secondary
+      --color-background: Page background
+      --color-foreground: Default text
+      --color-muted: Subtle backgrounds
+      --color-muted-foreground: Subtle text
+      --color-border: Border color
+      --color-ring: Focus ring
+      
+      Semantic colors (fixed):
+      --color-success: Green (#22c55e)
+      --color-error: Red (#ef4444)
+      --color-warning: Amber (#f59e0b)
+      --color-info: Blue (#3b82f6)
+      
+      Dark mode via Tailwind dark: prefix
+    </color_palette>
+    
+    <typography>
+      Font Stack:
+      - UI/Headings: Inter (system fallback: -apple-system, sans-serif)
+      - Long-form reading: Merriweather (optional, for course content)
+      - Code: JetBrains Mono (monospace fallback)
+      
+      Scale (using Tailwind defaults):
+      - text-xs: 12px
+      - text-sm: 14px
+      - text-base: 16px
+      - text-lg: 18px
+      - text-xl: 20px
+      - text-2xl: 24px
+      - text-3xl: 30px
+      - text-4xl: 36px
+      
+      Fluid typography for responsive headings
+    </typography>
+    
+    <components>
+      shadcn/ui components to implement:
+      - Button (variants: default, destructive, outline, secondary, ghost, link)
+      - Card (with header, content, footer)
+      - Dialog (modal)
+      - Dropdown Menu
+      - Form (with validation via react-hook-form + zod)
+      - Input, Textarea, Select
+      - Sheet (slide-over panel)
+      - Sidebar (collapsible navigation)
+      - Tabs
+      - Table (with sorting, pagination)
+      - Toast (notifications)
+      - Tooltip
+      - Avatar
+      - Badge
+      - Progress
+      - Skeleton (loading states)
+      - Alert
+      - Accordion
+      
+      Data visualization:
+      - Recharts for analytics dashboards
+      - Line, Bar, Area, Pie charts
+    </components>
+    
+    <animations>
+      Framer Motion patterns:
+      - Page transitions: Fade + slide (AnimatePresence)
+      - Modal enter/exit: Scale + fade
+      - List items: Stagger children
+      - Hover states: Scale (1.02), shadow elevation
+      - Button loading: Spinner + disabled state
+      - Skeleton pulse: Opacity animation
+      - Toast: Slide in from top-right
+      - Sidebar: Width transition
+      
+      Micro-interactions:
+      - Checkbox: Scale bounce on check
+      - Switch: Thumb slide with background color transition
+      - Progress: Width transition + color shift
+      - Upvote: Heart/arrow scale + color pop
+    </animations>
+  </design_system>
+
+  <key_interactions>
+    <tenant_provisioning_flow>
+      1. Visitor lands on marketing site
+      2. Selects pricing tier, clicks "Get Started"
+      3. Redirected to Clerk sign-up (embedded or hosted)
+      4. After sign-up, Stripe Checkout for payment
+      5. Stripe webhook received by Cloudflare Worker
+      6. Worker validates webhook signature
+      7. Worker calls Turso API: createDatabase({name: tenant-{id}, group: production})
+      8. Worker waits for database ready
+      9. Worker runs Drizzle migrations on new database
+      10. Worker creates tenant record in platform database
+      11. Worker creates Clerk organization, adds user as owner
+      12. User redirected to onboarding wizard in dashboard
+      13. Onboarding: Set community name, upload logo, invite first admin
+    </tenant_provisioning_flow>
+    
+    <course_creation_flow>
+      1. Admin clicks "Create Course" in dashboard
+      2. Enters title, description, selects pricing model
+      3. Course created in draft status
+      4. Admin adds modules via sidebar
+      5. Within modules, adds sections
+      6. Within sections, adds lessons
+      7. For video lesson: Uploads to R2, system generates thumbnail
+      8. For quiz: Uses quiz builder UI
+      9. Sets drip schedule if applicable
+      10. Previews as student
+      11. Clicks "Publish" - course goes live
+      12. Students can now enroll
+    </course_creation_flow>
+    
+    <student_enrollment_flow>
+      1. Student visits course landing page (public or within community)
+      2. Clicks "Enroll" button
+      3. If free: Immediate enrollment
+      4. If paid: Redirected to Clerk-embedded Stripe checkout
+      5. After payment: Webhook creates enrollment record
+      6. Student redirected to course player
+      7. First lesson auto-starts
+      8. Progress tracked as student advances
+      9. Drip content unlocks based on schedule
+      10. On completion: Certificate auto-generated
+      11. Student can share certificate to LinkedIn
+    </student_enrollment_flow>
+    
+    <video_clipping_flow>
+      1. User navigates to Video Processor
+      2. Pastes YouTube URL in input field
+      3. System validates URL format
+      4. System checks user's video processing credits
+      5. If insufficient: Prompt to purchase credits
+      6. User confirms processing
+      7. Job created with status "queued"
+      8. Cloudflare Queue receives job message
+      9. Worker picks up job:
+         a. Updates status to "downloading"
+         b. YT-DLP downloads video via Evomi proxy
+         c. Uploads raw video to R2
+         d. Updates status to "transcribing"
+         e. Whisper generates timestamped transcript
+         f. Updates status to "analyzing"
+         g. LLM identifies clip-worthy segments
+         h. Updates status to "clipping"
+         i. FFmpeg generates clips
+         j. Optional: Flux.1 generates b-roll images
+         k. Optional: Image-to-video converts b-roll
+         l. Updates status to "completed"
+      10. PartyKit sends real-time notification to user
+      11. User reviews clips in Airtable-style interface
+      12. User can trim, add captions, select b-roll
+      13. User exports clips in platform-specific formats
+      14. After 30 days: Cron job deletes processed files
+    </video_clipping_flow>
+    
+    <rag_agent_query_flow>
+      1. Community member types "@Agent what is...?" in chat
+      2. PartyKit server intercepts message with @Agent mention
+      3. Validates user has RAG access (unified course access required)
+      4. Checks user's daily query limit
+      5. Extracts query text after mention
+      6. Calls Workers AI to embed query text
+      7. Queries tenant's Cloudflare Vectorize index
+      8. Retrieves top 5 most similar content chunks
+      9. Constructs prompt:
+         - System prompt from tenant's RAG config
+         - Retrieved context
+         - User's query
+      10. Calls LLM via OpenRouter (or BYOK)
+      11. Parses response, extracts citations
+      12. Posts response to chat thread
+      13. Includes source links if cite_sources enabled
+      14. Logs query to ai_usage table
+    </rag_agent_query_flow>
+    
+    <funnel_ab_test_flow>
+      1. Admin creates landing page in builder
+      2. Clicks "Create A/B Test" on page
+      3. Defines goal metric (click, submission, purchase)
+      4. Sets goal selector (CSS selector for click/form)
+      5. Creates Variant B (duplicates current page)
+      6. Edits Variant B in builder
+      7. Sets traffic split (e.g., 50/50)
+      8. Clicks "Start Test"
+      9. Visitors randomly assigned to variants
+      10. Assignment stored in cookie for consistency
+      11. Conversions tracked against each variant
+      12. Dashboard shows running stats
+      13. When statistical significance reached: Alert
+      14. Admin reviews results
+      15. Admin declares winner or continues test
+      16. Winner variant becomes default page
+    </funnel_ab_test_flow>
+  </key_interactions>
+
+  <implementation_steps>
+    <phase_1 title="Core Infrastructure &amp; Auth" weeks="1-4">
+      <tasks>
+        - Scaffold Turborepo monorepo structure
+        - Set up packages: @platform/core, @platform/database
+        - Configure Turso platform database connection
+        - Create Drizzle schemas for platform-level tables
+        - Implement Clerk authentication integration
+        - Map Clerk Organizations to Platform Tenants
+        - Build tenant provisioning Worker (webhook handler)
+        - Create tenant database dynamically via Turso API
+        - Run migrations on new tenant databases
+        - Implement role-based access control middleware
+        - Create god-mode impersonation flow
+        - Set up audit logging (append-only)
+        - Deploy to Cloudflare Workers (staging)
+      </tasks>
+    </phase_1>
+    
+    <phase_2 title="LMS Foundation" weeks="5-8">
+      <tasks>
+        - Create tenant-level Drizzle schemas (courses, lessons, progress)
+        - Build Course CRUD API endpoints
+        - Build Module/Section/Lesson CRUD
+        - Implement drag-and-drop reordering
+        - Create video upload to R2 with signed URLs
+        - Build course editor UI (Next.js)
+        - Build student course player UI
+        - Implement progress tracking logic
+        - Build quiz builder and grading
+        - Implement drip content scheduling
+        - Create certificate PDF generation
+        - Build certificate verification page
+      </tasks>
+    </phase_2>
+    
+    <phase_3 title="Funnel &amp; Page Builder" weeks="9-12">
+      <tasks>
+        - Integrate GrapesJS into builder app
+        - Create component block library (20+ blocks)
+        - Build style manager extensions
+        - Implement responsive preview modes
+        - Create headless CMS API (JSON page creation)
+        - Build page publishing workflow
+        - Implement custom domain mapping
+        - Create public page rendering engine
+        - Build A/B testing infrastructure
+        - Implement traffic splitting logic
+        - Create conversion tracking
+        - Build funnel analytics dashboard
+      </tasks>
+    </phase_3>
+    
+    <phase_4 title="Community &amp; Realtime" weeks="13-16">
+      <tasks>
+        - Set up PartyKit server (chat, presence)
+        - Implement WebSocket connection handling
+        - Build chat UI component
+        - Create forum structure (categories, threads, posts)
+        - Build thread and post CRUD
+        - Implement nested replies
+        - Add upvoting mechanism
+        - Build member directory
+        - Implement gamification (points, badges)
+        - Create leaderboard component
+        - Build notification system
+        - Implement notification preferences
+        - Add email digest functionality
+      </tasks>
+    </phase_4>
+    
+    <phase_5 title="AI Content Generation" weeks="17-20">
+      <tasks>
+        - Create @platform/ai package
+        - Integrate OpenRouter client
+        - Implement BYOK credential storage (encrypted)
+        - Build AI generation middleware (routing logic)
+        - Create cost tracking per AI call
+        - Build course outline generator UI
+        - Build email sequence writer UI
+        - Build quiz question generator
+        - Implement rate limiting per tier
+        - Create graceful degradation logic
+        - Build AI usage dashboard
+      </tasks>
+    </phase_5>
+    
+    <phase_6 title="Analytics &amp; Commerce" weeks="21-24">
+      <tasks>
+        - Create @platform/analytics package
+        - Implement cost tracking middleware
+        - Build usage metrics collection
+        - Create analytics dashboard (Recharts)
+        - Build course analytics view
+        - Build funnel analytics view
+        - Implement LTV calculations
+        - Create churn prediction indicators
+        - Build god-mode financial dashboard
+        - Implement migration trigger alerts
+        - Set up Stripe subscription webhooks
+        - Implement usage-based billing logic
+        - Build subscription management UI
+      </tasks>
+    </phase_6>
+    
+    <phase_7 title="Video Processing" weeks="25-28">
+      <tasks>
+        - Create video-processor app
+        - Integrate YT-DLP for downloads
+        - Set up Evomi proxy integration
+        - Implement FFmpeg pipeline
+        - Integrate Whisper for transcription
+        - Build clip selection LLM logic
+        - Implement b-roll generation (Flux.1)
+        - Create Cloudflare Queue job handler
+        - Build video processor UI
+        - Create Airtable-style clip grid
+        - Implement 30-day auto-deletion cron
+        - Build video credits system
+      </tasks>
+    </phase_7>
+    
+    <phase_8 title="Advanced Features &amp; Polish" weeks="29-32">
+      <tasks>
+        - Set up Cloudflare Vectorize for RAG
+        - Implement content chunking and embedding
+        - Build RAG query pipeline
+        - Create @Agent mention handler
+        - Build RAG configuration UI
+        - Implement white-label branding UI
+        - Create domain verification flow
+        - Conduct security audit
+        - Implement god-mode disable feature (irreversible)
+        - Performance optimization (edge caching)
+        - Image optimization pipeline
+        - Load testing and fixes
+        - Documentation completion
+      </tasks>
+    </phase_8>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - [ ] Tenant isolation verified: Tenant A cannot access Tenant B data under any circumstance
+      - [ ] Real-time chat message delivery under 100ms latency
+      - [ ] Video processing pipeline generates clips from YouTube URL within 10 minutes
+      - [ ] A/B tests correctly split traffic and report statistically significant results
+      - [ ] RAG agent provides grounded answers with source citations
+      - [ ] Certificates generate with correct user/course data and verify publicly
+      - [ ] Custom domains provision and serve tenant content correctly
+      - [ ] God-mode impersonation works and is fully audit-logged
+    </functionality>
+    
+    <user_experience>
+      - [ ] GrapesJS builder is intuitive with smooth drag-and-drop
+      - [ ] Course player is fully responsive on mobile devices
+      - [ ] Dark mode works consistently across all components
+      - [ ] White-label branding (logo, colors) applies correctly on tenant sites
+      - [ ] Page load times under 2 seconds on 3G connection
+      - [ ] Form validation provides clear, helpful error messages
+      - [ ] Loading states and skeletons prevent layout shift
+    </user_experience>
+    
+    <technical_quality>
+      - [ ] 200 tests per module (2,400+ total) with 80%+ pass rate before launch
+      - [ ] Turso migrations run successfully on every new tenant provision
+      - [ ] Rate limiting prevents abuse of AI and video processing resources
+      - [ ] BYOK credentials encrypted at rest, never logged
+      - [ ] Circuit breakers prevent cascade failures
+      - [ ] No console errors in production
+      - [ ] TypeScript strict mode enabled, no any types
+    </technical_quality>
+    
+    <business_metrics>
+      - [ ] Accurate cost attribution per tenant (within 5% of actual)
+      - [ ] God-mode dashboard reflects true platform state in real-time
+      - [ ] Migration trigger alerts fire correctly at defined thresholds
+      - [ ] Subscription tier limits enforced correctly
+      - [ ] Pass-through costs calculated and billed accurately
+    </business_metrics>
+  </success_criteria>
+
+  <notes>
+    <partykit_context>
+      PartyKit was acquired by Cloudflare in April 2024.
+      - No separate billing required
+      - Uses standard Cloudflare Durable Objects pricing
+      - Deploy to your own Cloudflare account (cloud-prem mode)
+      - Excellent Yjs integration for collaborative features
+    </partykit_context>
+    
+    <future_modules>
+      The modular architecture supports future additions:
+      - email-marketing: Campaign management (Mailchimp-like)
+      - sms-marketing: Twilio-powered text campaigns
+      - Advanced content repurposing (video to blog, podcast to social)
+      - Game/interactive content prototyping
+      
+      Placeholder directories exist for these in /modules
+    </future_modules>
+    
+    <byok_philosophy>
+      "Bring Your Own Key" serves two purposes:
+      1. Cost offloading: Heavy AI users pay providers directly
+      2. Trust: Users control their own API relationships
+      
+      Platform always has pooled fallback for convenience.
+    </byok_philosophy>
+    
+    <blast_radius_reminder>
+      The entire architectural decision to use Turso (vs Convex or shared DB) 
+      is driven by blast radius isolation. This is a SALES FEATURE for 
+      enterprise customers: "Your data is in a dedicated database."
+    </blast_radius_reminder>
+  </notes>
+</project_specification>
