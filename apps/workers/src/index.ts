@@ -1,23 +1,47 @@
+import { Container } from "@cloudflare/containers";
+
 interface Env {
   PLATFORM_KV: KVNamespace;
   RATE_LIMITS: KVNamespace;
   STORAGE: R2Bucket;
   VIDEO_QUEUE: Queue;
   VECTORIZE: VectorizeIndex;
+  VIDEO_PROCESSOR: DurableObjectNamespace;
   ENVIRONMENT: string;
-  
-  // Secrets (added via wrangler secret put)
   TURSO_PLATFORM_DB_URL?: string;
   TURSO_PLATFORM_AUTH_TOKEN?: string;
   CLERK_SECRET_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
+  ASSEMBLYAI_API_KEY?: string;  // ADD THIS
+}
+
+export class VideoProcessor extends Container {
+  defaultPort = 8080;
+  sleepAfter = "5m";
+  
+  // Note: For secrets, we'll pass them via the request instead
+  // envVars only works for non-sensitive config
+  envVars = {
+    MAX_VIDEO_LENGTH: "3600",
+  };
+
+  override onStart(): void {
+    console.log("VideoProcessor container started");
+  }
+
+  override onStop(): void {
+    console.log("VideoProcessor container stopped");
+  }
+
+  override onError(error: unknown): void {
+    console.error("VideoProcessor container error:", error);
+  }
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     
-    // CORS headers for development
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -29,7 +53,54 @@ export default {
     }
 
     try {
-      // Health check - verifies all bindings
+      // ========== CONTAINER ROUTES ==========
+      
+      if (url.pathname.startsWith("/process-video/")) {
+        const jobId = url.pathname.split("/process-video/")[1];
+        
+        if (!jobId) {
+          return Response.json(
+            { error: "Job ID required" },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+        
+        const id = env.VIDEO_PROCESSOR.idFromName(jobId);
+        const container = env.VIDEO_PROCESSOR.get(id);
+        return await container.fetch(request);
+      }
+      
+      if (url.pathname === "/test/container") {
+        const testId = "test-" + Date.now();
+        const id = env.VIDEO_PROCESSOR.idFromName(testId);
+        const container = env.VIDEO_PROCESSOR.get(id);
+        
+        const containerRequest = new Request("http://container/health", {
+          method: "GET",
+        });
+        
+        try {
+          const response = await container.fetch(containerRequest);
+          const data = await response.json();
+          
+          return Response.json({
+            success: true,
+            test: "container",
+            containerId: testId,
+            containerResponse: data,
+          }, { headers: corsHeaders });
+        } catch (error) {
+          return Response.json({
+            success: false,
+            test: "container",
+            error: error instanceof Error ? error.message : "Container failed to respond",
+            note: "Container may take 2-3 seconds to cold start on first request",
+          }, { headers: corsHeaders });
+        }
+      }
+
+      // ========== EXISTING ROUTES ==========
+      
       if (url.pathname === "/health") {
         return Response.json({
           status: "ok",
@@ -41,44 +112,35 @@ export default {
             r2_storage: !!env.STORAGE,
             queue_video: !!env.VIDEO_QUEUE,
             vectorize: !!env.VECTORIZE,
+            container_video: !!env.VIDEO_PROCESSOR,
           },
           secrets: {
             turso_url: !!env.TURSO_PLATFORM_DB_URL,
             turso_token: !!env.TURSO_PLATFORM_AUTH_TOKEN,
             clerk: !!env.CLERK_SECRET_KEY,
-            anthropic: !!env.ANTHROPIC_API_KEY,
+            openrouter: !!env.OPENROUTER_API_KEY,
+            assemblyai: !!env.ASSEMBLYAI_API_KEY,
           }
         }, { headers: corsHeaders });
       }
       
-      // Test KV read/write
       if (url.pathname === "/test/kv") {
         const testKey = "test-" + Date.now();
         await env.PLATFORM_KV.put(testKey, "Hello from KV!");
         const value = await env.PLATFORM_KV.get(testKey);
-        await env.PLATFORM_KV.delete(testKey); // Cleanup
-        return Response.json({ 
-          success: true, 
-          test: "kv",
-          value 
-        }, { headers: corsHeaders });
+        await env.PLATFORM_KV.delete(testKey);
+        return Response.json({ success: true, test: "kv", value }, { headers: corsHeaders });
       }
       
-      // Test R2 read/write
       if (url.pathname === "/test/r2") {
         const testKey = "test-file-" + Date.now() + ".txt";
         await env.STORAGE.put(testKey, "Hello from R2!");
         const object = await env.STORAGE.get(testKey);
         const text = await object?.text();
-        await env.STORAGE.delete(testKey); // Cleanup
-        return Response.json({ 
-          success: true, 
-          test: "r2",
-          content: text 
-        }, { headers: corsHeaders });
+        await env.STORAGE.delete(testKey);
+        return Response.json({ success: true, test: "r2", content: text }, { headers: corsHeaders });
       }
       
-      // Test Queue (send a message)
       if (url.pathname === "/test/queue") {
         await env.VIDEO_QUEUE.send({
           type: "test",
@@ -92,26 +154,21 @@ export default {
         }, { headers: corsHeaders });
       }
       
-      // Test Vectorize (create and query a test vector)
       if (url.pathname === "/test/vectorize") {
-        // Create a simple test vector (768 dimensions of 0.1)
         const testVector = new Array(768).fill(0.1);
         const testId = "test-" + Date.now();
         
-        // Insert
         await env.VECTORIZE.upsert([{
           id: testId,
           values: testVector,
           metadata: { test: true, timestamp: Date.now() }
         }]);
         
-        // Query
         const results = await env.VECTORIZE.query(testVector, {
           topK: 1,
           returnMetadata: true
         });
         
-        // Cleanup
         await env.VECTORIZE.deleteByIds([testId]);
         
         return Response.json({ 
@@ -121,34 +178,74 @@ export default {
         }, { headers: corsHeaders });
       }
       
-      // Test Anthropic API (OAuth Bearer token)
-      if (url.pathname === "/test/anthropic") {
-        if (!env.ANTHROPIC_API_KEY) {
+      if (url.pathname === "/test/ai") {
+        if (!env.OPENROUTER_API_KEY) {
           return Response.json({ 
             success: false, 
-            error: "ANTHROPIC_API_KEY not configured" 
+            error: "OPENROUTER_API_KEY not configured" 
           }, { status: 400, headers: corsHeaders });
         }
         
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
+        const model = url.searchParams.get("model") || "openai/gpt-4o-mini";
+        
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${env.ANTHROPIC_API_KEY}`,
-            "anthropic-version": "2023-06-01"
+            "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+            "HTTP-Referer": "https://api.quickbizkit.ai",
+            "X-Title": "Platform API Test"
           },
           body: JSON.stringify({
-            model: "claude-3-5-haiku-20241022",
+            model: model,
             max_tokens: 100,
-            messages: [{ role: "user", content: "Say 'API test successful!' and nothing else." }]
+            messages: [
+              { role: "user", content: "Say 'API test successful!' and nothing else." }
+            ]
           })
         });
         
         const data = await response.json();
         return Response.json({ 
           success: response.ok, 
-          test: "anthropic",
-          authMethod: "oauth_bearer",
+          test: "ai",
+          provider: "openrouter",
+          model: model,
+          response: data 
+        }, { headers: corsHeaders });
+      }
+
+      if (url.pathname === "/test/ai/claude") {
+        if (!env.OPENROUTER_API_KEY) {
+          return Response.json({ 
+            success: false, 
+            error: "OPENROUTER_API_KEY not configured" 
+          }, { status: 400, headers: corsHeaders });
+        }
+        
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+            "HTTP-Referer": "https://api.quickbizkit.ai",
+            "X-Title": "Platform API Test"
+          },
+          body: JSON.stringify({
+            model: "anthropic/claude-3.5-haiku",
+            max_tokens: 100,
+            messages: [
+              { role: "user", content: "Say 'Claude via OpenRouter test successful!' and nothing else." }
+            ]
+          })
+        });
+        
+        const data = await response.json();
+        return Response.json({ 
+          success: response.ok, 
+          test: "ai/claude",
+          provider: "openrouter",
+          model: "anthropic/claude-3.5-haiku",
           response: data 
         }, { headers: corsHeaders });
       }
@@ -163,7 +260,10 @@ export default {
           "GET /test/r2 - Test R2 storage", 
           "GET /test/queue - Test Queue",
           "GET /test/vectorize - Test Vectorize",
-          "GET /test/anthropic - Test Anthropic API"
+          "GET /test/container - Test Container (video processor)",
+          "GET /test/ai - Test AI via OpenRouter",
+          "GET /test/ai/claude - Test Claude via OpenRouter",
+          "POST /process-video/:jobId - Process video in container",
         ]
       }, { headers: corsHeaders });
       
@@ -175,11 +275,9 @@ export default {
     }
   },
   
-  // Queue consumer (handles video processing jobs)
-  async queue(batch: MessageBatch<any>, env: Env): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     for (const message of batch.messages) {
       console.log("Processing queue message:", message.body);
-      // TODO: Implement actual video processing
       message.ack();
     }
   }

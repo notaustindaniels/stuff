@@ -7,18 +7,25 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@cloudflare/containers':
+        specifier: 0.0.31
+        version: 0.0.31
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20241127.0
         version: 4.20251221.0
       typescript:
-        specifier: ^5.3.0
+        specifier: ^5.0.0
         version: 5.9.3
       wrangler:
         specifier: ^3.91.0
         version: 3.114.16(@cloudflare/workers-types@4.20251221.0)
 
 packages:
+
+  '@cloudflare/containers@0.0.31':
+    resolution: {integrity: sha512-zHxW6/JMzvK9To98OcNg2d3eiZUZRg11pARmQpJJyQdIQ0eQ/dh/Wpufx+HGd0k/xjMdrFP77YnOeopxdzsgng==}
 
   '@cloudflare/kv-asset-handler@0.3.4':
     resolution: {integrity: sha512-YLPHc8yASwjNkmcDMQMY35yiWjoKAKnhUbPRszBRS0YgH+IXtsMp61j+yTcnCE3oO2DgP0U3iejLC8FTtKDC8Q==}
@@ -528,6 +535,8 @@ packages:
     resolution: {integrity: sha512-EjIevzuJRiRPbVH4mGc8nApb/lVLKVpmUhAaR5R5doKGfAnGJ6Gr3CViAVjP+4FWSxCsybeWQdcgCtbX+7oZug==}
 
 snapshots:
+
+  '@cloudflare/containers@0.0.31': {}
 
   '@cloudflare/kv-asset-handler@0.3.4':
     dependencies:
