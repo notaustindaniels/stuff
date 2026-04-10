@@ -3,13 +3,24 @@
 Autonomous Coding Agent Demo
 ============================
 
-A minimal harness demonstrating long-running autonomous coding with Claude.
-This script implements the two-agent pattern (initializer + coding agent) and
-incorporates all the strategies from the long-running agents guide.
+A harness for long-running autonomous coding with Claude.
+Supports two modes:
+
+  spec  — Harness 1: Produces a systems-engineered specification bundle
+          through staged design reviews (SRR → PDR → CDR).
+
+  build — Harness 2: Builds an application from a specification using
+          the two-agent pattern (initializer + coding agent).
 
 Example Usage:
-    python autonomous_agent_demo.py --project-dir ./claude_clone_demo
-    python autonomous_agent_demo.py --project-dir ./claude_clone_demo --max-iterations 5
+    # Spec mode (Harness 1): generate a systems-engineered spec
+    python autonomous_agent_demo.py --mode spec --project-dir ./engine_spec
+
+    # Build mode (Harness 2): build from a spec
+    python autonomous_agent_demo.py --mode build --project-dir ./engine_build --spec-dir ./engine_spec/spec
+
+    # Build mode (legacy): build from app_spec.txt (original behavior)
+    python autonomous_agent_demo.py --project-dir ./my_project
 """
 
 import argparse
@@ -20,53 +31,69 @@ from pathlib import Path
 from agent import run_autonomous_agent
 
 
-# Configuration
-DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+# Default models per mode
+SPEC_DEFAULT_MODEL = "claude-opus-4-6"
+BUILD_DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Autonomous Coding Agent Demo - Long-running agent harness",
+        description="Autonomous Coding Agent — Spec-mode (Harness 1) and Build-mode (Harness 2)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Start fresh project
-  python autonomous_agent_demo.py --project-dir ./claude_clone
+  # Spec mode: produce a systems-engineered specification
+  python autonomous_agent_demo.py --mode spec --project-dir ./engine_spec
 
-  # Use a specific model
-  python autonomous_agent_demo.py --project-dir ./claude_clone --model claude-sonnet-4-5-20250929
+  # Build mode: build from the produced spec
+  python autonomous_agent_demo.py --mode build --project-dir ./engine_build --spec-dir ./engine_spec/spec
+
+  # Build mode (legacy): use app_spec.txt directly
+  python autonomous_agent_demo.py --project-dir ./my_project
 
   # Limit iterations for testing
-  python autonomous_agent_demo.py --project-dir ./claude_clone --max-iterations 5
-
-  # Continue existing project
-  python autonomous_agent_demo.py --project-dir ./claude_clone
+  python autonomous_agent_demo.py --mode spec --project-dir ./engine_spec --max-iterations 3
 
 Environment Variables:
-  ANTHROPIC_API_KEY    Your Anthropic API key (required)
+  CLAUDE_CODE_OAUTH_TOKEN    Your Claude Code OAuth token (required)
         """,
+    )
+
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["spec", "build"],
+        default="build",
+        help="Harness mode: 'spec' (Harness 1) produces a specification, 'build' (Harness 2) builds from one (default: build)",
     )
 
     parser.add_argument(
         "--project-dir",
         type=Path,
         default=Path("./autonomous_demo_project"),
-        help="Directory for the project (default: generations/autonomous_demo_project). Relative paths automatically placed in generations/ directory.",
+        help="Directory for the project output (default: generations/autonomous_demo_project)",
+    )
+
+    parser.add_argument(
+        "--spec-dir",
+        type=Path,
+        default=None,
+        help="(Build mode only) Path to a spec/ directory produced by spec mode",
     )
 
     parser.add_argument(
         "--max-iterations",
         type=int,
         default=None,
-        help="Maximum number of agent iterations (default: unlimited)",
+        help="Max iterations per gate (spec mode) or agent sessions (build mode). Default: unlimited for build, safety-net caps for spec.",
     )
 
     parser.add_argument(
         "--model",
         type=str,
-        default=DEFAULT_MODEL,
-        help=f"Claude model to use (default: {DEFAULT_MODEL})",
+        default=None,
+        help=f"Claude model to use (default: {SPEC_DEFAULT_MODEL} for spec, {BUILD_DEFAULT_MODEL} for build)",
     )
 
     return parser.parse_args()
@@ -84,26 +111,40 @@ def main() -> None:
         print("  export CLAUDE_CODE_OAUTH_TOKEN='your-oauth-token-here'")
         return
 
+    # Set default model based on mode
+    model = args.model
+    if model is None:
+        model = SPEC_DEFAULT_MODEL if args.mode == "spec" else BUILD_DEFAULT_MODEL
+
     # Automatically place projects in generations/ directory unless already specified
     project_dir = args.project_dir
     if not str(project_dir).startswith("generations/"):
-        # Convert relative paths to be under generations/
         if project_dir.is_absolute():
-            # If absolute path, use as-is
             pass
         else:
-            # Prepend generations/ to relative paths
             project_dir = Path("generations") / project_dir
 
-    # Run the agent
+    # Route to the appropriate harness
     try:
-        asyncio.run(
-            run_autonomous_agent(
-                project_dir=project_dir,
-                model=args.model,
-                max_iterations=args.max_iterations,
+        if args.mode == "spec":
+            from spec_agent import run_spec_agent
+
+            asyncio.run(
+                run_spec_agent(
+                    project_dir=project_dir,
+                    model=model,
+                    max_iterations=args.max_iterations,
+                )
             )
-        )
+        else:
+            # Build mode — original behavior
+            asyncio.run(
+                run_autonomous_agent(
+                    project_dir=project_dir,
+                    model=model,
+                    max_iterations=args.max_iterations,
+                )
+            )
     except KeyboardInterrupt:
         print("\n\nInterrupted by user")
         print("To resume, run the same command again")

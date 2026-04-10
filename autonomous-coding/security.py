@@ -10,9 +10,8 @@ import os
 import shlex
 
 
-# Allowed commands for development tasks
-# Minimal set needed for the autonomous coding demo
-ALLOWED_COMMANDS = {
+# Allowed commands for build-mode (Harness 2) — full development tasks
+BUILD_ALLOWED_COMMANDS = {
     # File inspection
     "ls",
     "cat",
@@ -20,6 +19,7 @@ ALLOWED_COMMANDS = {
     "tail",
     "wc",
     "grep",
+    "find",
     # File operations (agent uses SDK tools for most file ops, but cp/mkdir needed occasionally)
     "cp",
     "mkdir",
@@ -29,6 +29,7 @@ ALLOWED_COMMANDS = {
     # Node.js development
     "npm",
     "node",
+    "npx",
     # Version control
     "git",
     # Process management
@@ -39,6 +40,30 @@ ALLOWED_COMMANDS = {
     # Script execution
     "init.sh",  # Init scripts; validated separately
 }
+
+# Allowed commands for spec-mode (Harness 1) — read-only + git + file organization
+# No npm, node, network, or process management. The spec harness only writes documents.
+SPEC_ALLOWED_COMMANDS = {
+    # File inspection (read-only)
+    "ls",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "grep",
+    "find",
+    # File organization within project dir
+    "cp",
+    "mv",
+    "mkdir",
+    # Directory
+    "pwd",
+    # Version control
+    "git",
+}
+
+# Default to build-mode for backwards compatibility
+ALLOWED_COMMANDS = BUILD_ALLOWED_COMMANDS
 
 # Commands that need additional validation even when in the allowlist
 COMMANDS_NEEDING_EXTRA_VALIDATION = {"pkill", "chmod", "init.sh"}
@@ -294,11 +319,73 @@ def get_command_for_validation(cmd: str, segments: list[str]) -> str:
     return ""
 
 
+def create_bash_security_hook(allowed_commands: set | None = None):
+    """
+    Create a pre-tool-use hook with a specific command allowlist.
+
+    Args:
+        allowed_commands: Set of allowed command names. Defaults to BUILD_ALLOWED_COMMANDS.
+
+    Returns:
+        Async hook function
+    """
+    commands_set = allowed_commands or BUILD_ALLOWED_COMMANDS
+
+    async def hook(input_data, tool_use_id=None, context=None):
+        if input_data.get("tool_name") != "Bash":
+            return {}
+
+        command = input_data.get("tool_input", {}).get("command", "")
+        if not command:
+            return {}
+
+        commands = extract_commands(command)
+
+        if not commands:
+            return {
+                "decision": "block",
+                "reason": f"Could not parse command for security validation: {command}",
+            }
+
+        segments = split_command_segments(command)
+
+        for cmd in commands:
+            if cmd not in commands_set:
+                return {
+                    "decision": "block",
+                    "reason": f"Command '{cmd}' is not in the allowed commands list",
+                }
+
+            if cmd in COMMANDS_NEEDING_EXTRA_VALIDATION:
+                cmd_segment = get_command_for_validation(cmd, segments)
+                if not cmd_segment:
+                    cmd_segment = command
+
+                if cmd == "pkill":
+                    allowed, reason = validate_pkill_command(cmd_segment)
+                    if not allowed:
+                        return {"decision": "block", "reason": reason}
+                elif cmd == "chmod":
+                    allowed, reason = validate_chmod_command(cmd_segment)
+                    if not allowed:
+                        return {"decision": "block", "reason": reason}
+                elif cmd == "init.sh":
+                    allowed, reason = validate_init_script(cmd_segment)
+                    if not allowed:
+                        return {"decision": "block", "reason": reason}
+
+        return {}
+
+    return hook
+
+
+# Default hook for backwards compatibility
 async def bash_security_hook(input_data, tool_use_id=None, context=None):
     """
-    Pre-tool-use hook that validates bash commands using an allowlist.
+    Pre-tool-use hook that validates bash commands using the build-mode allowlist.
 
-    Only commands in ALLOWED_COMMANDS are permitted.
+    Only commands in BUILD_ALLOWED_COMMANDS are permitted.
+    For spec-mode, use create_bash_security_hook(SPEC_ALLOWED_COMMANDS) instead.
 
     Args:
         input_data: Dict containing tool_name and tool_input
@@ -308,52 +395,5 @@ async def bash_security_hook(input_data, tool_use_id=None, context=None):
     Returns:
         Empty dict to allow, or {"decision": "block", "reason": "..."} to block
     """
-    if input_data.get("tool_name") != "Bash":
-        return {}
-
-    command = input_data.get("tool_input", {}).get("command", "")
-    if not command:
-        return {}
-
-    # Extract all commands from the command string
-    commands = extract_commands(command)
-
-    if not commands:
-        # Could not parse - fail safe by blocking
-        return {
-            "decision": "block",
-            "reason": f"Could not parse command for security validation: {command}",
-        }
-
-    # Split into segments for per-command validation
-    segments = split_command_segments(command)
-
-    # Check each command against the allowlist
-    for cmd in commands:
-        if cmd not in ALLOWED_COMMANDS:
-            return {
-                "decision": "block",
-                "reason": f"Command '{cmd}' is not in the allowed commands list",
-            }
-
-        # Additional validation for sensitive commands
-        if cmd in COMMANDS_NEEDING_EXTRA_VALIDATION:
-            # Find the specific segment containing this command
-            cmd_segment = get_command_for_validation(cmd, segments)
-            if not cmd_segment:
-                cmd_segment = command  # Fallback to full command
-
-            if cmd == "pkill":
-                allowed, reason = validate_pkill_command(cmd_segment)
-                if not allowed:
-                    return {"decision": "block", "reason": reason}
-            elif cmd == "chmod":
-                allowed, reason = validate_chmod_command(cmd_segment)
-                if not allowed:
-                    return {"decision": "block", "reason": reason}
-            elif cmd == "init.sh":
-                allowed, reason = validate_init_script(cmd_segment)
-                if not allowed:
-                    return {"decision": "block", "reason": reason}
-
-    return {}
+    hook = create_bash_security_hook(BUILD_ALLOWED_COMMANDS)
+    return await hook(input_data, tool_use_id, context)

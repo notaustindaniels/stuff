@@ -1,0 +1,317 @@
+<project_specification>
+  <project_name>RISC Engine — A Remotion-for-Games Three.js Engine</project_name>
+
+  <north_star>
+    Build a minimal, declarative three.js game engine that achieves Unreal Engine 5-quality
+    visuals through a small set of composable React primitives. The engine is to game
+    development what Remotion is to video production: a focused toolkit where a Claude AI
+    skill can generate an endless variety of game types from one-line natural language prompts,
+    all from one engine.
+
+    The guiding metaphor is RISC vs CISC — Reduced Instruction Set Computing vs Complex
+    Instruction Set Computing. Unreal Engine is CISC: a massive, capable, everything-included
+    toolchain. This engine is RISC: a lean, composable, minimal-primitive toolkit that achieves
+    equivalent visual output through architectural elegance rather than brute coverage.
+
+    The structural principle is da Vinci's self-supporting log bridge: every component exists
+    in tension and compression against every other component. No component is bolted on as an
+    afterthought. Remove any one and the structure reveals its absence. Add any one and it
+    finds its natural seat. This is conceptual integrity in Fred Brooks's terms — a system
+    whose every piece reflects one coherent mental model.
+  </north_star>
+
+  <remotion_analogy>
+    Remotion succeeds because of four orthogonal primitives: Composition, Sequence,
+    useCurrentFrame, interpolate. Plus a renderer that turns React into mp4.
+    Everything else is composition of those primitives. A Claude skill can generate
+    an endless variety of video types because the primitives are orthogonal and compose.
+
+    This engine must achieve the same property: a small set of orthogonal primitives
+    that compose into maximum variety. A Claude skill should be able to emit a
+    TypeScript scene tree from a one-line game description, and the result should
+    compile, render, and look cinematic — without the skill needing to understand
+    rendering internals.
+
+    Remotion's SKILL.md is the instruction manual that makes this possible.
+    This engine's SKILL.md is an equally critical deliverable.
+  </remotion_analogy>
+
+  <design_principles>
+    <principle name="Small API Surface">
+      6-10 top-level primitives maximum. Every primitive is orthogonal — it does one thing
+      and composes with all others. No two primitives overlap in responsibility.
+      Target primitives: Engine, Scene, World, Actor, Camera, RenderStack,
+      PostFX, Input, Physics, plus hooks: useFrame, useInput, useEngine.
+    </principle>
+
+    <principle name="Small Cognitive Surface">
+      One way to do each thing. No alternate render paths. No "legacy" vs "modern" APIs.
+      A developer reads the docs once and knows the whole system. The engine should be
+      fully learnable in an afternoon.
+    </principle>
+
+    <principle name="Small Dependency Tree">
+      Pin all dependencies. Allowed runtime deps: three, @react-three/fiber,
+      @react-three/drei (selective imports only), @react-three/rapier, postprocessing,
+      realism-effects. No optional peer deps. No transitive bloat. Every dependency
+      must justify its presence against the North Star.
+    </principle>
+
+    <principle name="Tree-Shakeable by Primitive">
+      If you don't use PostFX, realism-effects doesn't end up in your bundle.
+      If you don't use Physics, rapier doesn't load. Each primitive is an independent
+      entry point that brings only its own deps.
+    </principle>
+
+    <principle name="Skill-First Design">
+      The engine is designed so that a Claude AI skill can author complete, working games
+      from natural language descriptions. This means: strong TypeScript types, self-documenting
+      APIs, sensible defaults for every parameter, presets that produce production-quality
+      output without tuning. If a fresh Claude session can't one-shot a game using only
+      the SKILL.md doc, the engine has failed.
+    </principle>
+
+    <principle name="Da Vinci Log Bridge">
+      Every component must be in structural relationship with every other component.
+      No bolted-on patches. No afterthoughts. If a new component is proposed, it must
+      find a natural seat in the existing structure or the structure must be redesigned
+      to accommodate it — never merely extended. This is the anti-spaghetti principle.
+      Architectural erosion is the primary failure mode this principle guards against.
+    </principle>
+  </design_principles>
+
+  <visual_target>
+    The visual floor is a reference three.js project that achieves near-Unreal visuals
+    using: SSR, SSGI, HBAO, Motion Blur (realism-effects), Bloom, Saturation, Contrast
+    (PostProcessing), Fog (Three.js), Environment and VideoTexture (ReactThreeDrei).
+    The developer notes: "I made this demo with 0 optimisation in mind. With proper
+    optimisation this will run much better."
+
+    The visual ceiling is Unreal Engine 5's Lumen/Nanite output on equivalent scene content.
+
+    This engine must produce output that is measurably closer to the Unreal ceiling than
+    the reference project's floor, using NVIDIA's FLIP perceptual quality metric on
+    identical scene geometry and lighting.
+
+    Specific visual properties to match or exceed:
+    - Global illumination bounce accuracy (SSGI with importance sampling)
+    - Screen-space reflection sharpness and coverage
+    - Shadow softness with correct contact shadows and penumbra
+    - Specular highlight correctness on varying roughness surfaces
+    - Temporal stability (near-zero per-pixel luminance variance over 60-frame windows)
+    - Cinematic anti-aliasing (TRAA for filmic look, no jaggies)
+    - Atmospheric depth (fog, bloom, tone mapping working in concert)
+    - Motion blur coherence during camera movement
+
+    The reference rendering pipeline: SSGI -> TRAA -> Bloom -> HueSaturation -> ToneMapping,
+    with a VelocityDepthNormalPass feeding the temporal effects. This is the proven pipeline
+    from the reference project, to be refined and optimized.
+
+    Key tuning parameters from the reference (cinematic preset baseline):
+    - SSGI: distance=60, thickness=3, steps=120, refineSteps=4, spp=1, resolutionScale=1
+    - SSGI denoiser: iterations=1, kernel=3, diffuse=25, specular=25.54
+    - SSGI phi values: phi=0.587, lumaPhi=5.978, depthPhi=11.957, normalPhi=21.739
+    - Bloom: mipmapBlur=true, luminanceThreshold=0.7, intensity=0.8, radius=0.5
+    - TRAA: enabled by default in cinematic preset
+    - ToneMapping: default ACES filmic
+    - HueSaturation: saturation=0.2
+  </visual_target>
+
+  <architecture>
+    <module name="Core (Engine)">
+      The Engine root component. Provides React context for all subsystems.
+      Manages the render loop, clock, and frame lifecycle.
+      Exposes useFrame (per-frame callback) and useEngine (access engine state).
+      This is the only required component — all others are opt-in.
+    </module>
+
+    <module name="Scene Graph (Scene, World, Actor, Camera)">
+      Scene wraps a three.js scene with managed lifecycle.
+      World provides the environment (HDR envmap, fog, ambient settings).
+      Actor is a positioned, named entity that can hold mesh, physics body, and behaviors.
+      Camera provides camera management with smooth follow/orbit/free modes.
+      Components compose freely: an Actor can contain other Actors. A Scene can contain
+      multiple Worlds (for level streaming or scene transitions).
+    </module>
+
+    <module name="Render Stack (RenderStack, PostFX)">
+      RenderStack preset="cinematic" provides the full post-processing pipeline.
+      Presets: "cinematic" (Unreal-like), "stylized", "retro", "minimal", "none".
+      PostFX allows individual effect overrides within a RenderStack.
+      The cinematic preset wires: SSGI + TRAA + Bloom + HueSat + ToneMap.
+      All parameters exposed as props with sensible defaults.
+      Uses 0beqz's realism-effects (SSGI, TRAA, Motion Blur) and pmndrs postprocessing.
+    </module>
+
+    <module name="Physics">
+      Wraps @react-three/rapier for physics simulation.
+      Actors opt into physics via a physics prop: Actor physics="dynamic".
+      Collider shapes derived automatically from mesh geometry (trimesh for static,
+      capsule/box/sphere for dynamic based on heuristics).
+      Gravity, materials, and collision groups configurable at World level.
+    </module>
+
+    <module name="Input">
+      Provides unified keyboard/mouse/touch/gamepad handling.
+      useInput() hook returns action states, not raw keys.
+      Action mapping is declarative: { forward: ['w', 'ArrowUp'], jump: ['Space'] }.
+      Built-in presets: "fps", "third-person", "rts", "spectator".
+    </module>
+
+    <module name="Audio">
+      Spatial audio via Web Audio API + three.js positional audio.
+      Audio component with spatial/ambient/directional modes.
+      Declarative: attach to an Actor for spatial, to World for ambient.
+      Volume, falloff, and reverb zone primitives.
+    </module>
+
+    <module name="Character">
+      Built-in third-person and first-person character controller presets.
+      Wires Input -> Physics -> Animation -> Camera automatically.
+      CharacterController preset="third-person" model="character.glb".
+      Animation state machine driven by movement state (idle/walk/run/jump).
+      Customizable: override any sub-system while keeping the others wired.
+    </module>
+  </architecture>
+
+  <technology_stack>
+    <runtime>Browser (WebGL2 via three.js)</runtime>
+    <framework>React 19+ with @react-three/fiber 9+</framework>
+    <language>TypeScript 5.5+ (strict mode, no any, exactOptionalPropertyTypes)</language>
+    <build>Vite 6+</build>
+    <physics>@react-three/rapier (Rapier WASM physics)</physics>
+    <rendering>three.js r170+ with postprocessing 6+ and realism-effects</rendering>
+    <testing>
+      Vitest (unit and integration tests)
+      Playwright (visual regression via headless browser)
+      Custom FLIP pipeline (perceptual quality comparison)
+    </testing>
+    <package_format>
+      npm-publishable ES module package
+      Multiple entry points for tree-shaking:
+        risc-engine (core only)
+        risc-engine/render (render stack)
+        risc-engine/physics (physics)
+        risc-engine/input (input)
+        risc-engine/audio (audio)
+        risc-engine/character (character controller)
+        risc-engine/full (everything)
+    </package_format>
+  </technology_stack>
+
+  <verification_requirements>
+    <category name="Visual Regression">
+      FLIP perceptual quality metric against Unreal Engine golden reference images.
+      Three-way bracket: reference repo floor, engine candidate, Unreal ceiling.
+      Pass condition: engine FLIP distance to Unreal less than reference repo FLIP distance.
+      Per-commit monotonic improvement (no regression allowed).
+
+      Sub-property isolation scenes:
+      - Cornell box for GI bounce accuracy
+      - Mirror sphere for reflection sharpness
+      - Complex occluder for shadow quality
+      - Roughness gradient sphere for specular correctness
+      - 120-frame orbit for temporal stability (stddev of per-pixel luminance below threshold)
+    </category>
+
+    <category name="Performance">
+      Frame-time budgets on reference hardware:
+      - At least 60fps on RTX 3060 equivalent at 1080p
+      - At least 30fps on M1 MacBook at 1080p
+      - Cold start (time to first frame) under 3 seconds on broadband
+      Convergence rate: SSGI must reach stable output within 8 frames of camera movement.
+    </category>
+
+    <category name="API Surface">
+      TypeScript declaration files are the public contract.
+      All exports typed, no any.
+      Breaking changes fail CI.
+      API surface size tracked: total exported symbols must stay under threshold.
+    </category>
+
+    <category name="Orthogonality">
+      Each primitive removable in isolation without breaking others.
+      Matrix of N primitive combinations must all mount and render without error.
+    </category>
+
+    <category name="Composition">
+      Random compositions of primitives produce valid output.
+      Fuzz testing of prop combinations on each primitive.
+    </category>
+
+    <category name="Skill Feasibility">
+      Given 5 natural-language game descriptions, the SKILL.md doc must be sufficient
+      for a fresh Claude session to emit TypeScript scene trees that:
+      - Parse successfully as valid TypeScript
+      - Type-check against declared interfaces with no errors
+      - Render without runtime errors in the browser
+      - Produce visually coherent output
+    </category>
+
+    <category name="Bundle Size">
+      Tree-shake test: render-stack-only bundle size vs full-engine bundle size
+      verifies dead-code elimination is working.
+      No primitive pulls in another primitive's deps transitively.
+    </category>
+
+    <category name="Determinism">
+      Same scene + same random seed produces identical pixels frame-to-frame.
+      Required for visual regression to not flake in CI.
+    </category>
+
+    <category name="Convergence Rate">
+      Temporal effects (SSGI, TRAA) must converge to stable output within a measured
+      frame budget after any camera or scene change. Convergence defined as:
+      per-pixel luminance delta between frame N and N+1 falls below threshold.
+    </category>
+
+    <category name="Strict TypeScript">
+      strict mode, no any, exactOptionalPropertyTypes.
+      Catches interface sloppiness at compile time.
+    </category>
+  </verification_requirements>
+
+  <deliverables>
+    1. The engine: an npm-publishable package with the primitives described above
+    2. SKILL.md: A comprehensive authoring guide sufficient for Claude to generate games
+    3. Reference scenes: at least 3 demo scenes exercising different engine capabilities
+    4. Visual regression suite: FLIP-based CI pipeline with golden images
+    5. Performance benchmark suite: automated frame-time and convergence measurement
+    6. API documentation: generated from TypeScript types
+    7. feature_list.json: pre-seeded test list for the build harness to execute against
+  </deliverables>
+
+  <what_this_is_not>
+    This is NOT:
+    - An editor (no GUI scene editor, no inspector, no asset browser)
+    - An asset pipeline (no model importers, no texture compressors beyond three.js loaders)
+    - A networking layer (no multiplayer, no server authority, no lobby system)
+    - A scripting system (no visual scripting, no blueprint graphs)
+    - A marketplace (no plugin system, no third-party extension API)
+
+    These may be built ON TOP of the engine later, but they are explicitly out of scope
+    for the initial system. The engine is the kernel. Everything else is userspace.
+  </what_this_is_not>
+
+  <reference_material>
+    The following reference project demonstrates that near-Unreal visuals are achievable
+    in three.js with the right post-processing stack. Key architectural observations:
+
+    Components used: SSREffects.tsx, Effects.tsx, PostProcessing.tsx, Lighting.tsx,
+    Billboard.jsx, Character.jsx, CharacterController.jsx, Map.jsx, Experience.jsx.
+
+    The visual fidelity comes primarily from:
+    1. 0beqz's realism-effects library (SSGI, TRAA, Motion Blur)
+    2. pmndrs postprocessing library (Bloom, ToneMapping, HueSaturation)
+    3. HDR environment maps (city.hdr) for realistic lighting
+    4. Tuned SSGI parameters (high step count, importance sampling, careful phi values)
+    5. Fog for atmospheric depth
+    6. Shadow-mapped directional light with large orthographic camera
+
+    The reference project achieves this with zero optimization. This engine should match
+    or exceed the visual quality while also being optimized for performance.
+
+    Credit: 0beqz (realism-effects author) for SSGI, SSR, TRAA, Motion Blur, SVGF,
+    and Temporal Reprojection implementations.
+  </reference_material>
+</project_specification>
