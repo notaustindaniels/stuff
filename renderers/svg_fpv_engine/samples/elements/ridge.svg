@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 240" width="1600" height="240">
+  <defs>
+    <linearGradient id="rfar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a2240"/>
+      <stop offset="60%" stop-color="#241332"/>
+      <stop offset="100%" stop-color="#0e0820"/>
+    </linearGradient>
+    <linearGradient id="rmid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1230"/>
+      <stop offset="100%" stop-color="#080612"/>
+    </linearGradient>
+  </defs>
+  <!-- far layer silhouette -->
+  <path d="M0 240
+           L0 130 L60 110 L130 90 L210 102 L300 60 L380 90 L460 50 L540 80 L620 30 L700 60
+           L780 78 L860 40 L940 76 L1020 28 L1100 64 L1180 80 L1260 46 L1340 80 L1420 50
+           L1500 88 L1580 70 L1600 100 L1600 240 Z"
+        fill="url(#rfar)"/>
+  <!-- mid layer silhouette -->
+  <path d="M0 240
+           L0 180 L80 168 L170 174 L260 150 L360 170 L450 144 L560 168 L660 138 L760 162
+           L860 134 L960 158 L1060 130 L1170 156 L1270 134 L1380 160 L1480 138 L1580 164 L1600 158 L1600 240 Z"
+        fill="url(#rmid)"/>
+  <!-- a couple of distant tree silhouettes near the silhouette ridge -->
+  <g fill="#070512">
+    <path d="M340 170 L348 144 L342 144 L350 124 L344 124 L354 108 L360 108 L370 124 L364 124 L372 144 L366 144 L374 170 Z"/>
+    <path d="M880 162 L887 140 L883 140 L890 124 L886 124 L894 110 L900 110 L908 124 L904 124 L911 140 L907 140 L914 162 Z"/>
+    <path d="M1300 158 L1306 138 L1302 138 L1308 124 L1304 124 L1312 112 L1318 112 L1326 124 L1322 124 L1328 138 L1324 138 L1330 158 Z"/>
+  </g>
+</svg>

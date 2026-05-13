@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" width="240" height="200">
+  <defs>
+    <linearGradient id="cwall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a2517"/>
+      <stop offset="100%" stop-color="#1c100a"/>
+    </linearGradient>
+    <linearGradient id="croof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a0f0a"/>
+      <stop offset="100%" stop-color="#0a0604"/>
+    </linearGradient>
+    <radialGradient id="cwindow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#ffd070"/>
+      <stop offset="55%" stop-color="#e88030"/>
+      <stop offset="100%" stop-color="#702010" stop-opacity="0.6"/>
+    </radialGradient>
+  </defs>
+  <!-- ground shadow -->
+  <ellipse cx="120" cy="196" rx="115" ry="6" fill="#000" opacity="0.45"/>
+  <!-- main walls (anchored at bottom of viewBox) -->
+  <rect x="22" y="86" width="196" height="110" fill="url(#cwall)"/>
+  <!-- horizontal log lines -->
+  <g stroke="#0a0604" stroke-width="1.2" opacity="0.6">
+    <line x1="22" y1="100" x2="218" y2="100"/>
+    <line x1="22" y1="115" x2="218" y2="115"/>
+    <line x1="22" y1="130" x2="218" y2="130"/>
+    <line x1="22" y1="145" x2="218" y2="145"/>
+    <line x1="22" y1="160" x2="218" y2="160"/>
+    <line x1="22" y1="175" x2="218" y2="175"/>
+  </g>
+  <!-- pitched roof -->
+  <path d="M10 92 L120 24 L230 92 L218 92 L218 86 L22 86 L22 92 Z" fill="url(#croof)"/>
+  <!-- chimney -->
+  <rect x="170" y="32" width="16" height="38" fill="#0a0604"/>
+  <rect x="166" y="28" width="24" height="8" fill="#150a06"/>
+  <!-- glowing windows -->
+  <rect x="50" y="118" width="32" height="36" fill="url(#cwindow)"/>
+  <rect x="158" y="118" width="32" height="36" fill="url(#cwindow)"/>
+  <g stroke="#0a0604" stroke-width="1.5" fill="none">
+    <line x1="66" y1="118" x2="66" y2="154"/>
+    <line x1="50" y1="136" x2="82" y2="136"/>
+    <line x1="174" y1="118" x2="174" y2="154"/>
+    <line x1="158" y1="136" x2="190" y2="136"/>
+  </g>
+  <!-- door -->
+  <rect x="106" y="138" width="28" height="58" fill="#0a0604"/>
+  <rect x="110" y="142" width="20" height="50" fill="url(#cwindow)" opacity="0.55"/>
+  <circle cx="128" cy="168" r="1.5" fill="#ffd070"/>
+</svg>

@@ -1,0 +1,85 @@
+{
+  "scene_id": "cabin_at_dusk",
+  "world_unit": "meter",
+  "extent": { "x": [-200, 200], "y": [-50, 100], "z": [-300, 50] },
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 24,
+    "duration_s": 8.0,
+    "bg_color": "#070414"
+  },
+  "camera": {
+    "ease": "smoothstep",
+    "keyframes": [
+      { "t": 0.0, "pos": [ 0, 2.0,  30], "yaw": 0.00, "pitch":  0.00, "roll":  0.00, "fov_deg": 65 },
+      { "t": 4.0, "pos": [ 0, 3.0,   0], "yaw": 0.18, "pitch": -0.06, "roll":  0.05, "fov_deg": 65 },
+      { "t": 8.0, "pos": [ 6, 4.0, -28], "yaw": 0.45, "pitch": -0.12, "roll": -0.18, "fov_deg": 65 }
+    ]
+  },
+  "elements": [
+    {
+      "id": "sky",
+      "svg": "elements/sky.svg",
+      "pos": [0, 40, -260],
+      "size_m": [600, 225],
+      "anchor": "center",
+      "slant_k": 0.0,
+      "near_fade_m": 0.0
+    },
+    {
+      "id": "ridge_far",
+      "svg": "elements/ridge.svg",
+      "pos": [-10, 0, -180],
+      "size_m": [400, 60],
+      "anchor": "bottom",
+      "slant_k": 0.6,
+      "near_fade_m": 0.0
+    },
+    {
+      "id": "ridge_mid",
+      "svg": "elements/ridge.svg",
+      "pos": [20, 0, -90],
+      "size_m": [220, 36],
+      "anchor": "bottom",
+      "slant_k": 0.5,
+      "near_fade_m": 0.0
+    },
+    {
+      "id": "cabin",
+      "svg": "elements/cabin.svg",
+      "pos": [9, 0, -38],
+      "size_m": [12, 10],
+      "anchor": "bottom",
+      "slant_k": 0.0,
+      "near_fade_m": 1.0
+    },
+    {
+      "id": "tree_left",
+      "svg": "elements/tree.svg",
+      "pos": [-7, 0, -15],
+      "size_m": [6, 12],
+      "anchor": "bottom",
+      "slant_k": 0.0,
+      "near_fade_m": 1.0
+    },
+    {
+      "id": "tree_right",
+      "svg": "elements/tree.svg",
+      "pos": [14, 0, -22],
+      "size_m": [5, 10],
+      "anchor": "bottom",
+      "slant_k": 0.0,
+      "near_fade_m": 1.0
+    },
+    {
+      "id": "bush_path",
+      "svg": "elements/bush.svg",
+      "pos": [3.2, 0, 6],
+      "size_m": [1.6, 1.0],
+      "anchor": "bottom",
+      "slant_k": 0.0,
+      "near_fade_m": 2.0
+    }
+  ]
+}
