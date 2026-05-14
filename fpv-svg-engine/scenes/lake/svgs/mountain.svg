@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400">
+  <defs>
+    <linearGradient id="ridge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#0c0a18"/>
+      <stop offset="80%" stop-color="#160e22"/>
+      <stop offset="100%" stop-color="#1c1428"/>
+    </linearGradient>
+  </defs>
+  <!-- Single ridge silhouette. Valleys reach the SVG bottom so no fill
+       remains below the silhouette. -->
+  <path d="M0,400 L80,300 L160,260 L220,330 L260,290 L300,200 L360,140 L420,90 L500,50 L560,30 L620,55 L700,110 L760,170 L800,230 L860,150 L920,210 L980,280 L1040,340 L1120,380 L1200,400 Z" fill="url(#ridge)"/>
+</svg>

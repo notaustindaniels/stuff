@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 1024" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#08081e"/>
+      <stop offset="30%" stop-color="#1a1a4a"/>
+      <stop offset="65%" stop-color="#5a3a78"/>
+      <stop offset="88%" stop-color="#c66848"/>
+      <stop offset="98%" stop-color="#e8a060"/>
+      <stop offset="100%" stop-color="#9a5040"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#2a2440"/>
+      <stop offset="20%" stop-color="#101828"/>
+      <stop offset="100%" stop-color="#020408"/>
+    </linearGradient>
+    <linearGradient id="horizonGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffb070" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#ffcc88" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ff8040" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0"   width="2048" height="512" fill="url(#sky)"/>
+  <rect x="0" y="512" width="2048" height="512" fill="url(#water)"/>
+  <rect x="0" y="488" width="2048" height="48"  fill="url(#horizonGlow)"/>
+</svg>

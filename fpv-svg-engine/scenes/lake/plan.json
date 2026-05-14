@@ -1,0 +1,53 @@
+{
+  "_note": "Hand-authored 'resolved plan' for the lake scene. The Math Resolver will eventually produce inputs of this shape from a sparser director-spec. All distances are meters. Coordinates: +x right, +y up, +z forward. Camera looks toward +z.",
+  "scene_id": "lake_v1",
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 24,
+    "duration_s": 5.0,
+    "fov_x_deg": 60.0,
+    "near_m": 0.5,
+    "background_rgb": [0, 0, 0]
+  },
+  "camera": {
+    "keyframes": [
+      {"t": 0.0, "pos": [0.0, 1.5, -10.0], "look_at": [0.0, 1.5, 100.0]},
+      {"t": 5.0, "pos": [0.0, 1.5,  30.0], "look_at": [0.0, 1.5, 140.0]}
+    ]
+  },
+  "elements": [
+    {"kind": "backdrop", "svg": "svgs/backdrop.svg", "pos": [0, 1.5, 9000], "size_m": [12000, 6000], "fade": {"near_m": 100, "far_m": 20000}},
+
+    {"kind": "mountain", "svg": "svgs/mountain.svg", "pos": [-2200, 500, 5200], "size_m": [3000, 1000], "fade": {"near_m": 400, "far_m": 9000}},
+    {"kind": "mountain", "svg": "svgs/mountain.svg", "pos": [  400, 567, 5800], "size_m": [3400, 1133], "fade": {"near_m": 400, "far_m": 9000}},
+    {"kind": "mountain", "svg": "svgs/mountain.svg", "pos": [ 2400, 467, 4800], "size_m": [2800,  933], "fade": {"near_m": 400, "far_m": 9000}},
+
+    {"kind": "cloud", "svg": "svgs/cloud.svg", "pos": [-600, 1100, 3000], "size_m": [1600, 600], "fade": {"near_m": 200, "far_m": 6000}},
+    {"kind": "cloud", "svg": "svgs/cloud.svg", "pos": [ 800, 1300, 3400], "size_m": [1800, 700], "fade": {"near_m": 200, "far_m": 6000}},
+    {"kind": "cloud", "svg": "svgs/cloud.svg", "pos": [ 200, 1000, 2600], "size_m": [1200, 450], "fade": {"near_m": 200, "far_m": 6000}},
+    {"kind": "cloud", "svg": "svgs/cloud.svg", "pos": [-1400, 1200, 3300], "size_m": [1500, 540], "fade": {"near_m": 200, "far_m": 6000}},
+
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-3.0, 0.10,  3.5], "size_m": [0.55, 0.18], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 1.5, 0.08,  5.2], "size_m": [0.60, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 4.0, 0.12,  7.0], "size_m": [0.50, 0.16], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-2.2, 0.09,  9.5], "size_m": [0.65, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-5.0, 0.11, 12.0], "size_m": [0.55, 0.18], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 3.0, 0.10, 14.5], "size_m": [0.60, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 0.5, 0.08, 17.0], "size_m": [0.50, 0.18], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-7.0, 0.10, 20.0], "size_m": [0.70, 0.22], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 6.0, 0.11, 23.0], "size_m": [0.55, 0.18], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-3.5, 0.09, 27.0], "size_m": [0.60, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 2.5, 0.10, 31.0], "size_m": [0.65, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-1.0, 0.10, 36.0], "size_m": [0.55, 0.18], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [10.0, 0.11, 42.0], "size_m": [0.70, 0.22], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-9.0, 0.10, 48.0], "size_m": [0.60, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 4.0, 0.10, 55.0], "size_m": [0.55, 0.18], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-4.0, 0.09, 64.0], "size_m": [0.65, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [14.0, 0.11, 75.0], "size_m": [0.70, 0.22], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-12.0, 0.10, 88.0], "size_m": [0.65, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [ 0.0, 0.10,103.0], "size_m": [0.60, 0.20], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [18.0, 0.11,125.0], "size_m": [0.70, 0.22], "fade": {"near_m": 1.2, "far_m": 220}},
+    {"kind": "wave_crest", "svg": "svgs/wave_crest.svg", "pos": [-20.0, 0.10,150.0], "size_m": [0.70, 0.22], "fade": {"near_m": 1.2, "far_m": 220}}
+  ]
+}

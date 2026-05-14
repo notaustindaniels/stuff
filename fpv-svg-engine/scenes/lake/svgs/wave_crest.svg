@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200">
+  <defs>
+    <linearGradient id="crest" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0f6ff" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#8fb8d8" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#3a5878" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M20,150 Q80,90 140,120 Q200,150 260,80 Q320,40 380,90 Q440,140 500,100 Q540,80 580,130 L580,180 L20,180 Z" fill="url(#crest)"/>
+  <path d="M40,140 Q120,100 200,130 Q280,150 360,110 Q440,90 520,130" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.6" stroke-linecap="round"/>
+</svg>
